@@ -1,20 +1,17 @@
-import React, { useEffect, useState } from 'react';
+// Modified by Variya 2026-09-11: restrained light UI and maintainer identity.
+import React, { useState } from 'react';
 import { Form, Input, Button, message, Typography, Tooltip } from 'antd';
-import { LockOutlined, UserOutlined, QuestionCircleOutlined, GithubOutlined, StarFilled } from '@ant-design/icons';
+import { LockOutlined, UserOutlined, QuestionCircleOutlined, GithubOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
-import UsageNotice from '../components/UsageNotice';
-import { authApi, setToken, api } from '../api';
+import BrandMark from '../components/BrandMark';
+import ProjectCredits from '../components/ProjectCredits';
+import { authApi, setToken } from '../api';
 
 const { Title, Text } = Typography;
 
 const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [stars, setStars] = useState<number | null>(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    api.getGitHubStars().then(setStars).catch(() => {});
-  }, []);
 
   const handleSubmit = async (values: { password: string }) => {
     setLoading(true);
@@ -32,9 +29,9 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="jc-auth-bg">
-      <Tooltip title="去 GitHub Star 支持我们">
+      <Tooltip title="joyCode2api-VABoost 源码仓库（GitHub / Gitee 同步）">
         <a
-          href="https://github.com/vibe-coding-labs/JoyCode2Api"
+          href="https://github.com/variyaone/JoyCode2api-VABoost"
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -44,27 +41,18 @@ const LoginPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            color: 'rgba(248, 250, 252, 0.7)',
+            color: '#5966A6',
             fontSize: 13,
             textDecoration: 'none',
-            transition: 'color 200ms ease',
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#F8FAFC')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(248, 250, 252, 0.7)')}
         >
           <GithubOutlined style={{ fontSize: 18 }} />
-          GitHub
-          {stars !== null && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 2 }}>
-              <StarFilled style={{ fontSize: 13, color: '#F59E0B' }} />
-              <span style={{ fontSize: 12 }}>{stars.toLocaleString()}</span>
-            </span>
-          )}
+          VABoost
         </a>
       </Tooltip>
       <div className="jc-auth-card">
         <div className="jc-auth-logo">
-          <img src="/favicon.ico" alt="JoyCode" style={{ width: 28, height: 28, filter: 'brightness(0) invert(1)' }} />
+          <BrandMark size={40} />
         </div>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <Title level={3} style={{ marginBottom: 4 }}>JoyCode 代理</Title>
@@ -92,16 +80,16 @@ const LoginPage: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
-        <UsageNotice />
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Link
             to="/forgot-password"
-            style={{ color: '#94A3B8', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4, transition: 'color 200ms ease' }}
+            style={{ color: '#646B78', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
             <QuestionCircleOutlined />
             忘记密码？
           </Link>
         </div>
+        <ProjectCredits />
       </div>
     </div>
   );

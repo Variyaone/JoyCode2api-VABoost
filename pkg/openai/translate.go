@@ -39,8 +39,20 @@ func TranslateRequest(req *ChatRequest) map[string]interface{} {
 	if len(req.Stop) > 0 {
 		body["stop"] = json.RawMessage(req.Stop)
 	}
-	if len(req.Thinking) > 0 && ReasoningModels[req.Model] {
-		body["thinking"] = json.RawMessage(req.Thinking)
+	effort := req.ReasoningEffort
+	if effort == "" {
+		effort = joycode.ReasoningEffort(req.Reasoning)
+	}
+	if effort != "" {
+		// Preserve even unrecognized values: acceptance/validation belongs to
+		// upstream, and xhigh/max must not silently become high locally.
+		body["reasoning_effort"] = effort
+	}
+	if len(req.Reasoning) > 0 && joycode.IsResponsesAPIModel(req.Model) {
+		body["reasoning"] = json.RawMessage(req.Reasoning)
+	}
+	if thinking := joycode.ChatThinking(req.Thinking, req.Model, effort); thinking != nil {
+		body["thinking"] = thinking
 	}
 	return body
 }
@@ -104,6 +116,9 @@ func newShortID() string {
 // If the client-specified model is a known JoyCode model, pass it through.
 // Otherwise fall back to the account's default model, then the global default.
 func ResolveModel(model string, accountDefault string, systemDefault string) string {
+	if joycode.IsCompletionOnlyModel(model) {
+		return model
+	}
 	for _, m := range joycode.Models {
 		if m == model {
 			return model

@@ -18,6 +18,7 @@ type MessageRequest struct {
 	Tools         []Tool          `json:"tools,omitempty"`
 	ToolChoice    json.RawMessage `json:"tool_choice,omitempty"`
 	Thinking      *ThinkingConfig `json:"thinking,omitempty"`
+	OutputConfig  *OutputConfig   `json:"output_config,omitempty"`
 }
 
 // MessageParam is a single message in the conversation.
@@ -33,10 +34,77 @@ type Tool struct {
 	InputSchema json.RawMessage `json:"input_schema"`
 }
 
-// ThinkingConfig enables extended thinking.
+// ThinkingConfig enables extended thinking. A missing budget must stay absent:
+// adaptive thinking rejects budget_tokens, including an artificial zero value.
 type ThinkingConfig struct {
-	Type         string `json:"type"`
-	BudgetTokens int    `json:"budget_tokens"`
+	Type         string                     `json:"type"`
+	BudgetTokens int                        `json:"budget_tokens,omitempty"`
+	ExtraFields  map[string]json.RawMessage `json:"-"`
+}
+
+func (c *ThinkingConfig) UnmarshalJSON(data []byte) error {
+	type plain ThinkingConfig
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &decoded.ExtraFields); err != nil {
+		return err
+	}
+	delete(decoded.ExtraFields, "type")
+	delete(decoded.ExtraFields, "budget_tokens")
+	*c = ThinkingConfig(decoded)
+	return nil
+}
+
+func (c ThinkingConfig) MarshalJSON() ([]byte, error) {
+	type plain ThinkingConfig
+	return marshalConfig(plain(c), c.ExtraFields)
+}
+
+// OutputConfig preserves effort and structured-output configuration. Keep future
+// options raw so a typed SDK request does not silently lose upstream settings.
+type OutputConfig struct {
+	Effort      string                     `json:"effort,omitempty"`
+	Format      json.RawMessage            `json:"format,omitempty"`
+	ExtraFields map[string]json.RawMessage `json:"-"`
+}
+
+func (c *OutputConfig) UnmarshalJSON(data []byte) error {
+	type plain OutputConfig
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &decoded.ExtraFields); err != nil {
+		return err
+	}
+	delete(decoded.ExtraFields, "effort")
+	delete(decoded.ExtraFields, "format")
+	*c = OutputConfig(decoded)
+	return nil
+}
+
+func (c OutputConfig) MarshalJSON() ([]byte, error) {
+	type plain OutputConfig
+	return marshalConfig(plain(c), c.ExtraFields)
+}
+
+func marshalConfig(config interface{}, extra map[string]json.RawMessage) ([]byte, error) {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+	for key, value := range extra {
+		if _, known := fields[key]; !known {
+			fields[key] = value
+		}
+	}
+	return json.Marshal(fields)
 }
 
 // --- Response types (server-side serialization) ---
@@ -88,9 +156,9 @@ type sseContentBlockDelta struct {
 }
 
 type deltaText struct {
-	Type         string `json:"type"`
-	Text         string `json:"text,omitempty"`
-	PartialJSON  string `json:"partial_json,omitempty"`
+	Type        string `json:"type"`
+	Text        string `json:"text,omitempty"`
+	PartialJSON string `json:"partial_json,omitempty"`
 }
 
 type sseContentBlockStop struct {
@@ -118,5 +186,3 @@ type ssePing struct {
 type sseMessageStop struct {
 	Type string `json:"type"`
 }
-
-

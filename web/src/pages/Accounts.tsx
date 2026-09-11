@@ -1,3 +1,4 @@
+// Modified by Variya 2026-09-11: restrained light UI; account actions unchanged.
 import React, { useEffect, useState } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, Switch, Select,
@@ -134,9 +135,9 @@ const DraggableRow: React.FC<DraggableRowProps> = (props) => {
 const DragHandle: React.FC<{ id: string }> = ({ id }) => {
   const { listeners, setActivatorNodeRef } = useSortable({ id });
   return (
-    <td ref={setActivatorNodeRef} {...listeners} style={{ cursor: 'grab', width: 40, textAlign: 'center' }}>
-      <HolderOutlined style={{ color: '#999' }} />
-    </td>
+    <span ref={setActivatorNodeRef} {...listeners} role="button" tabIndex={0} aria-label="拖动排序账号" style={{ cursor: 'grab', display: 'inline-block', width: 24, textAlign: 'center' }}>
+      <HolderOutlined style={{ color: '#646B78' }} />
+    </span>
   );
 };
 
@@ -302,7 +303,7 @@ const Accounts: React.FC = () => {
         <Tooltip title={accountDisplayName(record)} placement="topLeft">
           <Space size={6} style={{ minWidth: 0 }}>
             {record.is_default && (
-              <StarFilled style={{ color: '#22C55E', fontSize: 13, flexShrink: 0 }} />
+              <StarFilled style={{ color: '#5966A6', fontSize: 13, flexShrink: 0 }} />
             )}
             <Typography.Text strong ellipsis style={{ minWidth: 0 }}>
               {accountDisplayName(record)}
@@ -328,7 +329,7 @@ const Accounts: React.FC = () => {
       key: 'active_sessions',
       width: 88,
       render: (val: number) => val > 0 ? (
-        <Tag color="blue">{val} 个活跃</Tag>
+        <Tag>{val} 个活跃</Tag>
       ) : (
         <Typography.Text type="secondary">无</Typography.Text>
       ),
@@ -342,7 +343,7 @@ const Accounts: React.FC = () => {
         <div style={{ lineHeight: 1.4 }}>
           <Typography.Text strong style={{ fontSize: 13 }}>{val}</Typography.Text>
           <br />
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>累计 {record.total_requests}</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>累计 {record.total_requests}</Typography.Text>
         </div>
       ),
     },
@@ -355,7 +356,7 @@ const Accounts: React.FC = () => {
         <div style={{ lineHeight: 1.4 }}>
           <Typography.Text strong style={{ fontSize: 13 }}>{fmtTokens(val)}</Typography.Text>
           <br />
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>累计 {fmtTokens(record.total_tokens)}</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>累计 {fmtTokens(record.total_tokens)}</Typography.Text>
         </div>
       ),
     },
@@ -371,7 +372,7 @@ const Accounts: React.FC = () => {
       key: 'default_model',
       width: 130,
       ellipsis: true,
-      render: (val: string) => val ? <Tag color="green" style={{ maxWidth: '100%' }}>{val}</Tag> : <Typography.Text type="secondary">未设置</Typography.Text>,
+      render: (val: string) => val ? <Tag style={{ maxWidth: '100%' }}>{val}</Tag> : <Typography.Text type="secondary">未设置</Typography.Text>,
     },
     {
       title: '快速启动',
@@ -681,7 +682,7 @@ const Accounts: React.FC = () => {
               <Space size={4}>
                 JoyCode ptKey 凭证
                 <Tooltip title="普通模型使用网页 OAuth 登录得到的长 ptKey。Claude 模型还会从本机 JoyCode IDE 状态文件读取短 ptKey，不会覆盖这里保存的普通账号凭证。">
-                  <QuestionCircleOutlined style={{ color: '#999' }} />
+                  <QuestionCircleOutlined style={{ color: '#646B78' }} />
                 </Tooltip>
               </Space>
             }
@@ -695,7 +696,7 @@ const Accounts: React.FC = () => {
               <Space size={4}>
                 JoyCode 用户 ID
                 <Tooltip title="与 ptKey 对应的用户 ID。获取方式：打开 JoyCode 桌面客户端 → 设置 → 个人信息 → 复制用户 ID">
-                  <QuestionCircleOutlined style={{ color: '#999' }} />
+                  <QuestionCircleOutlined style={{ color: '#646B78' }} />
                 </Tooltip>
               </Space>
             }
@@ -709,7 +710,7 @@ const Accounts: React.FC = () => {
               <Space size={4}>
                 默认模型
                 <Tooltip title="选择 Claude-Opus-4.7 时，请确保本机 JoyCode IDE 已登录，并按提示挂载 state.vscdb。非 Claude 模型继续使用网页 OAuth 凭证。">
-                  <QuestionCircleOutlined style={{ color: '#999' }} />
+                  <QuestionCircleOutlined style={{ color: '#646B78' }} />
                 </Tooltip>
               </Space>
             }
@@ -727,7 +728,7 @@ const Accounts: React.FC = () => {
               <Space size={4}>
                 设为默认账号
                 <Tooltip title="当客户端未提供路由密钥时，请求将自动路由到此默认账号。建议将最常用的账号设为默认">
-                  <QuestionCircleOutlined style={{ color: '#999' }} />
+                  <QuestionCircleOutlined style={{ color: '#646B78' }} />
                 </Tooltip>
               </Space>
             }
@@ -809,7 +810,7 @@ const Accounts: React.FC = () => {
         okButtonProps={{ loading: oauthSubmitting }}
       >
         {oauthWaiting && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, color: '#666' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, color: '#646B78' }}>
             <Spin />
             <span style={{ fontSize: 13 }}>已打开授权页面，正在自动检测授权结果（本地部署适用）...</span>
           </div>

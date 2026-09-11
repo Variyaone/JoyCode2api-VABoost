@@ -69,6 +69,44 @@ func findToolPairBoundary(messages []MessageParam, cutEnd int) int {
 	if cutEnd <= 1 || cutEnd >= len(messages) {
 		return cutEnd
 	}
+	// Tool calls and results may be separated by mid-turn system messages or
+	// parallel tool results. Pair by ID rather than assuming role alternation.
+	uses := make(map[string]int)
+	for i, message := range messages {
+		if message.Role != "assistant" {
+			continue
+		}
+		var blocks []contentBlock
+		if json.Unmarshal(message.Content, &blocks) != nil {
+			continue
+		}
+		for _, block := range blocks {
+			if block.Type == "tool_use" && block.ID != "" {
+				uses[block.ID] = i
+			}
+		}
+	}
+	for changed := true; changed; {
+		changed = false
+		for i := cutEnd; i < len(messages); i++ {
+			var blocks []contentBlock
+			if json.Unmarshal(messages[i].Content, &blocks) != nil {
+				continue
+			}
+			for _, block := range blocks {
+				if block.Type != "tool_result" {
+					continue
+				}
+				if use, ok := uses[block.ToolUseID]; ok && use >= 1 && use < cutEnd {
+					cutEnd = use
+					changed = true
+				}
+			}
+		}
+	}
+	if cutEnd <= 1 {
+		return cutEnd
+	}
 	prevRole := messages[cutEnd-1].Role
 	curRole := messages[cutEnd].Role
 
@@ -142,7 +180,7 @@ func truncateMessages(req *MessageRequest) bool {
 
 	// Adjust cutEnd to avoid splitting tool_use/tool_result pairs
 	cutEnd = findToolPairBoundary(req.Messages, cutEnd)
-	if cutEnd >= n {
+	if cutEnd <= keepFirst || cutEnd >= n {
 		return false
 	}
 

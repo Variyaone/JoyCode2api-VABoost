@@ -1,3 +1,4 @@
+// Modified by Variya 2026-09-11: restrained light UI; login polling unchanged.
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Modal, Typography, Button, Space, Alert, Spin } from 'antd';
 import { ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, SafetyCertificateOutlined, LoginOutlined } from '@ant-design/icons';
@@ -136,7 +137,7 @@ const QRLoginModal: React.FC<QRLoginModalProps> = ({ open, onClose, onSuccess, o
   const statusDisplay = () => {
     switch (status) {
       case 'loading':
-        return <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /><div style={{ marginTop: 12, color: '#666' }}>正在生成二维码...</div></div>;
+        return <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /><div style={{ marginTop: 12, color: '#646B78' }}>正在生成二维码...</div></div>;
       case 'waiting':
         return <Alert type="info" message="请使用京东 APP 扫描上方二维码" description={<>{`二维码有效期剩余 ${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}`}<br />{autoLoginHint}</>} showIcon />;
       case 'scanned':
@@ -195,8 +196,8 @@ const QRLoginModal: React.FC<QRLoginModalProps> = ({ open, onClose, onSuccess, o
         </Typography.Text>
         {qrImage && status !== 'confirmed' && (
           <div style={{
-            padding: 12, background: '#fff', borderRadius: 8,
-            border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            padding: 12, background: '#FFFFFF', borderRadius: 8,
+            border: '1px solid #E1E4EA',
           }}>
             <img src={qrImage} alt="QR Code" style={{ width: 200, height: 200 }} />
           </div>

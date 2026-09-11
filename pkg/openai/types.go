@@ -4,16 +4,18 @@ import "encoding/json"
 
 // ChatRequest is the OpenAI-compatible chat completion request.
 type ChatRequest struct {
-	Model       string          `json:"model"`
-	Messages    json.RawMessage `json:"messages"`
-	Stream      bool            `json:"stream,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature *float64        `json:"temperature,omitempty"`
-	TopP        *float64        `json:"top_p,omitempty"`
-	Tools       json.RawMessage `json:"tools,omitempty"`
-	ToolChoice  json.RawMessage `json:"tool_choice,omitempty"`
-	Stop        json.RawMessage `json:"stop,omitempty"`
-	Thinking    json.RawMessage `json:"thinking,omitempty"`
+	Model           string          `json:"model"`
+	Messages        json.RawMessage `json:"messages"`
+	Stream          bool            `json:"stream,omitempty"`
+	MaxTokens       int             `json:"max_tokens,omitempty"`
+	Temperature     *float64        `json:"temperature,omitempty"`
+	TopP            *float64        `json:"top_p,omitempty"`
+	Tools           json.RawMessage `json:"tools,omitempty"`
+	ToolChoice      json.RawMessage `json:"tool_choice,omitempty"`
+	Stop            json.RawMessage `json:"stop,omitempty"`
+	Thinking        json.RawMessage `json:"thinking,omitempty"`
+	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
+	Reasoning       json.RawMessage `json:"reasoning,omitempty"`
 }
 
 // ModelCapability describes a model's feature set.
@@ -46,7 +48,9 @@ var ModelCapabilities = map[string]ModelCapability{
 	"Doubao-Seed-2.0-pro": {MaxTokens: 16384, Ctx: 200000},
 }
 
-// ReasoningModels supports thinking/reasoning control parameters.
+// ReasoningModels is legacy capability metadata, not a request-parameter
+// allowlist. Explicit controls are translated independently; upstream acceptance
+// alone (some models even accept invalid effort) does not prove distinct levels.
 var ReasoningModels = map[string]bool{
 	"GLM-5.3": true, "GLM-5.2-jcloud": true, "GLM-5.1": true,
 	"Kimi-K3": true, "Kimi-K3-jcloud": true, "Kimi-K2.6": true,

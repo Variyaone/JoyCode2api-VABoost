@@ -71,6 +71,10 @@ var Models = []string{
 	"Doubao-Seed-2.0-pro",
 }
 
+// IsCompletionOnlyModel identifies upstream code-completion models. They must
+// not fall back to a chat model, but do not belong in the supported chat catalog.
+func IsCompletionOnlyModel(model string) bool { return model == "JoyCode-Base-V3" }
+
 // IsResponsesAPIModel reports whether the model is served through the OpenAI
 // Responses API (/api/saas/openai/v1/responses) rather than chat completions.
 // GPT-family models on the JoyCode platform reject the chat path with

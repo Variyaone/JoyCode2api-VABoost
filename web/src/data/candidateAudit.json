@@ -1,0 +1,1575 @@
+{
+  "schemaVersion": 2,
+  "snapshotId": "model-audit-20260911-reviewed-v1",
+  "frozenAt": "2026-09-11T11:19:43.936Z",
+  "sources": [
+    {
+      "id": "frozen-v1",
+      "sha256": "237b0aae3928496626184bfc8756c17714817779b099db2df79da3e9409ebb5f",
+      "date": "2026-09-11T11:19:43.936Z"
+    },
+    {
+      "id": "snapshot-schema",
+      "sha256": "a3b54209e8523acf7b7525bc60950b2a4e65a8875c65f501d62c9ca57b29c7bd"
+    },
+    {
+      "id": "repair-review",
+      "sha256": "6433465bd097e64a4b79943718cf0cad9c6295d1b0c5b1dcd695e2dfc5ca32b1"
+    }
+  ],
+  "deployment": "candidate-only",
+  "productionDeployed": false,
+  "releaseReady": false,
+  "codeReview": {
+    "status": "six-confirmed-defects-fixed-and-independently-verified",
+    "scope": "six-reported-defects-only",
+    "evidenceId": "repair-review",
+    "items": [
+      {
+        "id": "anonymous-text-deduplication",
+        "verified": true
+      },
+      {
+        "id": "terminal-text-order",
+        "verified": true
+      },
+      {
+        "id": "tool-index-order",
+        "verified": true
+      },
+      {
+        "id": "native-thinking-budget-cap",
+        "verified": true
+      },
+      {
+        "id": "resolved-model-outbound",
+        "verified": true
+      },
+      {
+        "id": "responses-small-token-limit",
+        "verified": true
+      }
+    ]
+  },
+  "candidate": {
+    "packagedExecutableSHA256": "208c7237ea7308af8b9008cb6cdeb8a964ba5bf9a5390a1d8abf087ab35342b7",
+    "packagedBuiltAt": "2026-09-11T11:16:19.948Z",
+    "testFixtureSHA256": "f3bb1279f64b180aa4254d165ea2e27313ab4c6ce71ca7e3d1767a8c5517fc2a",
+    "baseCommit": "966b4c099ebbfa4c5b23fcda21fa1e7fe274d318",
+    "uncommittedBackendChanges": true,
+    "hashScope": "package-identity-only-fixture-bound-to-enhanced-runs"
+  },
+  "collection": {
+    "startedAt": "2026-09-11T08:12:46.834Z",
+    "endedAtUpperBound": "2026-09-11T11:13:24.765Z",
+    "timezone": "UTC",
+    "scope": "selected-tool-ultracode-records"
+  },
+  "models": [
+    {
+      "id": "JoyAI-Code-1.5",
+      "kind": "chat",
+      "effortEvidence": "已透传；上游连非法值也接受，五档有效性未证实",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e0",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e1",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e2",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e3",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e4",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "failed",
+        "parentBypass": true,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e5",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": [
+        "Ultracode委派行为未通过"
+      ]
+    },
+    {
+      "id": "GLM-5.3",
+      "kind": "chat",
+      "effortEvidence": "已透传；上游连非法值也接受，五档有效性未证实",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e6",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e7",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e8",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e9",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e10",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e11",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": {
+        "status": "passed",
+        "test": "Bash",
+        "sdkResultExact": true,
+        "routeVerified": true,
+        "childIdentityVerified": null,
+        "evidenceId": "e12",
+        "buildIdentity": "recorded-per-run",
+        "testFixtureSHA256": "f3bb1279f64b180aa4254d165ea2e27313ab4c6ce71ca7e3d1767a8c5517fc2a",
+        "limitations": []
+      },
+      "limitations": []
+    },
+    {
+      "id": "GLM-5.2-jcloud",
+      "kind": "chat",
+      "effortEvidence": "五档schema接受，效果差异未验证",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e13",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e14",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e15",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e16",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e17",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e18",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "Kimi-K3",
+      "kind": "chat",
+      "effortEvidence": "已透传；上游连非法值也接受，五档有效性未证实",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e19",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e20",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e21",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e22",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e23",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e24",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "Kimi-K3-jcloud",
+      "kind": "chat",
+      "effortEvidence": "已透传；上游连非法值也接受，五档有效性未证实",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e25",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e26",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e27",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e28",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e29",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e30",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "DeepSeek-V4-Pro",
+      "kind": "chat",
+      "effortEvidence": "五档schema接受，效果差异未验证",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e31",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e32",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e33",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e34",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e35",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e36",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "MiniMax-M3",
+      "kind": "chat",
+      "effortEvidence": "已透传；上游连非法值也接受，五档有效性未证实",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e37",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e38",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e39",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e40",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e41",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e42",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": [
+        "四档正文仍混入推理内容"
+      ]
+    },
+    {
+      "id": "Doubao-Seed-2.0-pro",
+      "kind": "chat",
+      "effortEvidence": "需要thinking enabled；高档可能由上游折算",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e43",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e44",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e45",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e46",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e47",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e48",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "GPT-6 Astra",
+      "kind": "chat",
+      "effortEvidence": "接口回显五档；不等于质量分档保证",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e49",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e50",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e51",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e52",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e53",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e54",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": {
+        "status": "passed",
+        "test": "Ultracode",
+        "sdkResultExact": true,
+        "routeVerified": true,
+        "childIdentityVerified": true,
+        "evidenceId": "e55",
+        "buildIdentity": "recorded-per-run",
+        "testFixtureSHA256": "f3bb1279f64b180aa4254d165ea2e27313ab4c6ce71ca7e3d1767a8c5517fc2a",
+        "limitations": [
+          "First strict run hit 180s deadline; one retry with 360s overall deadline passed in about 181s."
+        ]
+      },
+      "limitations": []
+    },
+    {
+      "id": "GPT-5.6 Sol",
+      "kind": "chat",
+      "effortEvidence": "接口回显五档；不等于质量分档保证",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e56",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e57",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e58",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e59",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e60",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e61",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "Claude-Opus-5",
+      "kind": "chat",
+      "effortEvidence": "五档被接受，非法值被拒绝",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e62",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e63",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e64",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e65",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e66",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e67",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "Claude-Opus-4.8",
+      "kind": "chat",
+      "effortEvidence": "五档被接受，非法值被拒绝",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e68",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e69",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e70",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e71",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "observed",
+          "toolExecuted": true,
+          "toolResultReturned": true,
+          "strictOutput": true,
+          "sdkResultExact": true,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e72",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "observed-pass",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e73",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": []
+    },
+    {
+      "id": "JoyCode-Base-V3",
+      "kind": "code-completion",
+      "effortEvidence": "不适用",
+      "cells": [
+        {
+          "effort": "low",
+          "status": "not-applicable",
+          "toolExecuted": false,
+          "toolResultReturned": false,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e74",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "medium",
+          "status": "not-applicable",
+          "toolExecuted": false,
+          "toolResultReturned": false,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e75",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "high",
+          "status": "not-applicable",
+          "toolExecuted": false,
+          "toolResultReturned": false,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e76",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "xhigh",
+          "status": "not-applicable",
+          "toolExecuted": false,
+          "toolResultReturned": false,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e77",
+          "buildIdentity": "not-recorded"
+        },
+        {
+          "effort": "max",
+          "status": "not-applicable",
+          "toolExecuted": false,
+          "toolResultReturned": false,
+          "strictOutput": false,
+          "sdkResultExact": false,
+          "routeVerification": "aggregate-only-not-per-request",
+          "verificationMethod": "automated-tool-observation-and-saved-record-strict-sdk-predicate",
+          "evidenceId": "e78",
+          "buildIdentity": "not-recorded"
+        }
+      ],
+      "ultracode": {
+        "status": "not-supported",
+        "parentBypass": false,
+        "verificationMethod": "manual-child-transcript-and-journal",
+        "evidenceId": "e79",
+        "buildIdentity": "not-recorded"
+      },
+      "enhancedVerification": null,
+      "limitations": [
+        "禁止把其他模型fallback当本模型成功"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "e0",
+      "sha256": "3ed285836d5e3d2905ba5e298bf23f5ad491b03bcb8e2d94ad6b01f608bdfd70",
+      "startedAt": "2026-09-11T08:18:50.105Z",
+      "endedAtUpperBound": "2026-09-11T08:19:27.309Z"
+    },
+    {
+      "id": "e1",
+      "sha256": "ddffaf83747a8ec0c296312a9d8b2dc38d841e4f7bc5bfd2c35ef6b2c9cf0dca",
+      "startedAt": "2026-09-11T08:18:50.164Z",
+      "endedAtUpperBound": "2026-09-11T08:18:54.403Z"
+    },
+    {
+      "id": "e2",
+      "sha256": "e05670d68f8bafb3b2150bf4d401bd2e4a968373d07c000e7f95eefc40fcf49c",
+      "startedAt": "2026-09-11T08:18:58.554Z",
+      "endedAtUpperBound": "2026-09-11T08:19:06.973Z"
+    },
+    {
+      "id": "e3",
+      "sha256": "3a1042a1ea890e83d54231ade6fe03f715e4f6737ac93bdac3b3b9cc9d3122e4",
+      "startedAt": "2026-09-11T08:19:06.125Z",
+      "endedAtUpperBound": "2026-09-11T08:19:59.956Z"
+    },
+    {
+      "id": "e4",
+      "sha256": "e72aa078a21e4b5c29fa3fe5e14faac4d9c196d02ba942ecf29c17362684ec1d",
+      "startedAt": "2026-09-11T08:19:29.858Z",
+      "endedAtUpperBound": "2026-09-11T08:19:36.082Z"
+    },
+    {
+      "id": "e5",
+      "sha256": "a520742937a5226525526c42453d08c4eebf880eb0f9e74093149e0e9c9f8a9c",
+      "startedAt": "2026-09-11T09:45:31.984Z",
+      "endedAtUpperBound": "2026-09-11T09:46:01.544Z"
+    },
+    {
+      "id": "e6",
+      "sha256": "325ca6ea89099c6ea3d15edab6805ee612a63976ad906a6748139d9bbc8475c7",
+      "startedAt": "2026-09-11T08:19:35.324Z",
+      "endedAtUpperBound": "2026-09-11T08:19:50.436Z"
+    },
+    {
+      "id": "e7",
+      "sha256": "6b1912e2514424c674b388d5dc8e718cd88fa7b755e3d7461c1a751b69dd2200",
+      "startedAt": "2026-09-11T08:19:50.332Z",
+      "endedAtUpperBound": "2026-09-11T08:20:16.060Z"
+    },
+    {
+      "id": "e8",
+      "sha256": "07b54df0839ef2ac45d4caf81145992e71f083d738bd07c6ab0c547d58747e6a",
+      "startedAt": "2026-09-11T08:19:58.234Z",
+      "endedAtUpperBound": "2026-09-11T08:20:18.134Z"
+    },
+    {
+      "id": "e9",
+      "sha256": "e5fa67522b22ba9e622a16b719fa0943a3ea5a48111434db32d0ab47e6117b86",
+      "startedAt": "2026-09-11T08:20:16.339Z",
+      "endedAtUpperBound": "2026-09-11T08:20:25.526Z"
+    },
+    {
+      "id": "e10",
+      "sha256": "3cc73ce8778073ab2b008915acbf32d52e00584e5cb1df40feb2c83add48582a",
+      "startedAt": "2026-09-11T08:20:18.555Z",
+      "endedAtUpperBound": "2026-09-11T08:20:31.284Z"
+    },
+    {
+      "id": "e11",
+      "sha256": "5466c5c3b15522c0e442bc87ce4cee46a38851afef7a487597d62558be5a3d63",
+      "startedAt": "2026-09-11T08:12:46.834Z",
+      "endedAtUpperBound": "2026-09-11T08:13:05.873Z"
+    },
+    {
+      "id": "e12",
+      "sha256": "c0cab0f908ff06734b508efa772f1c27375a6555d8f01d524cb97402fd55864f",
+      "startedAt": "2026-09-11T11:07:37.729Z",
+      "endedAtUpperBound": "2026-09-11T11:07:54.926Z"
+    },
+    {
+      "id": "e13",
+      "sha256": "472dac5ee96ef3720643b925e624e84df5b42a2099277da5db56ef8b9590f7f9",
+      "startedAt": "2026-09-11T08:20:25.839Z",
+      "endedAtUpperBound": "2026-09-11T08:20:42.217Z"
+    },
+    {
+      "id": "e14",
+      "sha256": "090d7d6994fb03813334f0b61af840b0785e987c98f04ab8ecbb1b2e1b06e5cd",
+      "startedAt": "2026-09-11T08:20:31.514Z",
+      "endedAtUpperBound": "2026-09-11T08:20:41.689Z"
+    },
+    {
+      "id": "e15",
+      "sha256": "026fd952c9477b5e426be33d8cc9e0d69124f03db87a1f68813db473b491fc49",
+      "startedAt": "2026-09-11T08:20:42.950Z",
+      "endedAtUpperBound": "2026-09-11T08:20:59.637Z"
+    },
+    {
+      "id": "e16",
+      "sha256": "cd4006647114ab1673d86aa353b98cb7005e11c744e82f9e29c0b6748ad2e77c",
+      "startedAt": "2026-09-11T08:20:43.479Z",
+      "endedAtUpperBound": "2026-09-11T08:20:59.770Z"
+    },
+    {
+      "id": "e17",
+      "sha256": "f1143419dfd66cc3a4b3902a341385b627b9f83a980584f6e51afa7775f0d6af",
+      "startedAt": "2026-09-11T08:20:59.384Z",
+      "endedAtUpperBound": "2026-09-11T08:21:13.815Z"
+    },
+    {
+      "id": "e18",
+      "sha256": "77b40a1a7bf176f75820e216d6fbd9f89d3ed2cc89d55e86e2d2b0bf2aa918a2",
+      "startedAt": "2026-09-11T08:13:06.031Z",
+      "endedAtUpperBound": "2026-09-11T08:13:33.590Z"
+    },
+    {
+      "id": "e19",
+      "sha256": "bb5e8efd1f0a4676471cab1009701b7ad1f1918112813ccdde9b4507b0f1ed91",
+      "startedAt": "2026-09-11T08:20:59.625Z",
+      "endedAtUpperBound": "2026-09-11T08:21:10.731Z"
+    },
+    {
+      "id": "e20",
+      "sha256": "95c4b375d9e8cdaaa3a089b420aaf506d951536dd9bcccf0fde1b1b4029d32c4",
+      "startedAt": "2026-09-11T08:21:11.150Z",
+      "endedAtUpperBound": "2026-09-11T08:21:31.744Z"
+    },
+    {
+      "id": "e21",
+      "sha256": "7cbb2fe3449ea82bf85b964e6839313b27e8b44909974fc7776f6e93c52d270f",
+      "startedAt": "2026-09-11T08:21:14.259Z",
+      "endedAtUpperBound": "2026-09-11T08:21:37.603Z"
+    },
+    {
+      "id": "e22",
+      "sha256": "158abb4ddfd0af907f46b26867812d72378e27f9415feb4958dbc25deb0d3611",
+      "startedAt": "2026-09-11T08:21:33.122Z",
+      "endedAtUpperBound": "2026-09-11T08:21:47.671Z"
+    },
+    {
+      "id": "e23",
+      "sha256": "784f117c062a998ee6bfe3b986a859b2f4c5cf2a799f094912e3154f82b6b562",
+      "startedAt": "2026-09-11T08:21:38.650Z",
+      "endedAtUpperBound": "2026-09-11T08:21:47.233Z"
+    },
+    {
+      "id": "e24",
+      "sha256": "f97b698974f0b6718d2ab75211e2aae1ca3720be8ea1e73204f33d110f643a4f",
+      "startedAt": "2026-09-11T08:13:34.202Z",
+      "endedAtUpperBound": "2026-09-11T08:13:49.952Z"
+    },
+    {
+      "id": "e25",
+      "sha256": "e20f735219f8f90663505ec7f03feed87ad60d7fa91f817bbf39317fc75c2724",
+      "startedAt": "2026-09-11T08:21:48.150Z",
+      "endedAtUpperBound": "2026-09-11T08:22:05.006Z"
+    },
+    {
+      "id": "e26",
+      "sha256": "f1b5fd5e20563110a821e2c1272da5f0ee7ad99ee53917091387f6fd66492996",
+      "startedAt": "2026-09-11T08:21:48.178Z",
+      "endedAtUpperBound": "2026-09-11T08:22:06.861Z"
+    },
+    {
+      "id": "e27",
+      "sha256": "64a82be577e33e95709313c5aacb664aac15bc553eaa5b6c15ffe9535ca7f235",
+      "startedAt": "2026-09-11T08:22:05.404Z",
+      "endedAtUpperBound": "2026-09-11T08:22:20.810Z"
+    },
+    {
+      "id": "e28",
+      "sha256": "8f0e4a6638e5372fff6eb84ddc9a1f9e491c98478d5791ebc908176bcbae09ba",
+      "startedAt": "2026-09-11T08:22:07.577Z",
+      "endedAtUpperBound": "2026-09-11T08:22:21.724Z"
+    },
+    {
+      "id": "e29",
+      "sha256": "939ba10cf701e58fa7738c67dfea0ef50536d4917186419b9376b700bf1adf44",
+      "startedAt": "2026-09-11T08:22:20.918Z",
+      "endedAtUpperBound": "2026-09-11T08:22:33.955Z"
+    },
+    {
+      "id": "e30",
+      "sha256": "cb18923034e7e361ce90bcdda02602f29e7f78de6849639ed7f6edbde62b8d19",
+      "startedAt": "2026-09-11T09:46:02.293Z",
+      "endedAtUpperBound": "2026-09-11T09:46:36.948Z"
+    },
+    {
+      "id": "e31",
+      "sha256": "67756bda9d8eb0641d2e709cdb2afac9076b9dda94e9550113b3e83608fc582d",
+      "startedAt": "2026-09-11T08:22:22.072Z",
+      "endedAtUpperBound": "2026-09-11T08:22:50.357Z"
+    },
+    {
+      "id": "e32",
+      "sha256": "b2e837164e439548245ee7782720b7d62aff802fb4f003eee2b984df0b339d51",
+      "startedAt": "2026-09-11T08:22:33.862Z",
+      "endedAtUpperBound": "2026-09-11T08:22:44.629Z"
+    },
+    {
+      "id": "e33",
+      "sha256": "16eec7d29b8b1848a5d4294b1dc388d5a8837cdc1681f93727f14a9e0e406bee",
+      "startedAt": "2026-09-11T08:22:47.307Z",
+      "endedAtUpperBound": "2026-09-11T08:23:12.131Z"
+    },
+    {
+      "id": "e34",
+      "sha256": "14f47d0a5b4bfe50984e8e03f654caa1e0da75a3fe9d0e8056145648b0b52063",
+      "startedAt": "2026-09-11T08:22:50.761Z",
+      "endedAtUpperBound": "2026-09-11T08:23:13.824Z"
+    },
+    {
+      "id": "e35",
+      "sha256": "23ac8669e736f8284056ae3ad9cba2778c37e98f1eeac0ca60ab20cd55698ea0",
+      "startedAt": "2026-09-11T09:45:50.679Z",
+      "endedAtUpperBound": "2026-09-11T09:46:08.117Z"
+    },
+    {
+      "id": "e36",
+      "sha256": "673c76a69f2582ba140be4a2aa4e6bd671d555e25d445367e8e14c859b01a5b7",
+      "startedAt": "2026-09-11T08:15:23.296Z",
+      "endedAtUpperBound": "2026-09-11T08:15:56.227Z"
+    },
+    {
+      "id": "e37",
+      "sha256": "adf0bbca8005015ee065c3fa3edcb9addfd4a3ce4fe43a9cbb458374e90cf6a9",
+      "startedAt": "2026-09-11T09:45:09.866Z",
+      "endedAtUpperBound": "2026-09-11T09:45:17.720Z"
+    },
+    {
+      "id": "e38",
+      "sha256": "d1408bd0a08ceee5df92a783ab67121787a7a6394d1ac79b7191c0d4eb6c1689",
+      "startedAt": "2026-09-11T09:45:17.880Z",
+      "endedAtUpperBound": "2026-09-11T09:45:25.451Z"
+    },
+    {
+      "id": "e39",
+      "sha256": "5b261f0c3377e4e0594bff4f9fc9ed6b5f299730469e3d59046df80af4fb3558",
+      "startedAt": "2026-09-11T09:45:26.692Z",
+      "endedAtUpperBound": "2026-09-11T09:45:34.446Z"
+    },
+    {
+      "id": "e40",
+      "sha256": "bbcf908cb83e8e317e03c944dd6dc330db982e6e419ccc93fd2e5a7c54fad90d",
+      "startedAt": "2026-09-11T09:45:34.921Z",
+      "endedAtUpperBound": "2026-09-11T09:45:41.677Z"
+    },
+    {
+      "id": "e41",
+      "sha256": "9d36f662bf60c079d7e6e2ceb58fb77ee5a739f10a9c684468d93935da71324a",
+      "startedAt": "2026-09-11T09:45:42.334Z",
+      "endedAtUpperBound": "2026-09-11T09:45:49.553Z"
+    },
+    {
+      "id": "e42",
+      "sha256": "912b8b9379519705655276d5dd775c19794fbb00ede814dbfaccbbdaeb78ba14",
+      "startedAt": "2026-09-11T09:46:37.858Z",
+      "endedAtUpperBound": "2026-09-11T09:46:57.513Z"
+    },
+    {
+      "id": "e43",
+      "sha256": "b17d1f61bcda11652966e7977504a6691a8a554646cf329720ff92569ce22545",
+      "startedAt": "2026-09-11T08:29:31.115Z",
+      "endedAtUpperBound": "2026-09-11T08:29:41.971Z"
+    },
+    {
+      "id": "e44",
+      "sha256": "56136c0dfa1b705aa739a8515c58591363b8d1ff54c96ab846fb868cc8cdd61d",
+      "startedAt": "2026-09-11T08:29:42.482Z",
+      "endedAtUpperBound": "2026-09-11T08:29:54.541Z"
+    },
+    {
+      "id": "e45",
+      "sha256": "adcbbefafe0b5f094106f0319ce70615535e96c2238edfe3ffd11a9cd63ea3eb",
+      "startedAt": "2026-09-11T08:29:58.218Z",
+      "endedAtUpperBound": "2026-09-11T08:30:13.090Z"
+    },
+    {
+      "id": "e46",
+      "sha256": "87e01a88691b712fd2749ed903cbe471228da715a1d3b2463c83165b923a8aa8",
+      "startedAt": "2026-09-11T08:30:12.764Z",
+      "endedAtUpperBound": "2026-09-11T08:30:25.446Z"
+    },
+    {
+      "id": "e47",
+      "sha256": "b3807305dd7cdc743b340078b2dbb62ddef5b81f5e28cddbaadc39a84b57332b",
+      "startedAt": "2026-09-11T08:30:23.266Z",
+      "endedAtUpperBound": "2026-09-11T08:30:32.543Z"
+    },
+    {
+      "id": "e48",
+      "sha256": "c7a916b0eba5dd9076f1802f34b7fcb55c985ebdda24e8917b3848545ba362c5",
+      "startedAt": "2026-09-11T08:16:51.335Z",
+      "endedAtUpperBound": "2026-09-11T08:18:24.110Z"
+    },
+    {
+      "id": "e49",
+      "sha256": "d71d36bfcdcd6cbfde4cf9f45ecdc3bd7c43d4eee6e9e003a572ddf4b7ff6617",
+      "startedAt": "2026-09-11T08:30:32.874Z",
+      "endedAtUpperBound": "2026-09-11T08:30:43.492Z"
+    },
+    {
+      "id": "e50",
+      "sha256": "34477cfd62844c9f17ff332bb55c98b2b894625b946d5321803ceca454c031e5",
+      "startedAt": "2026-09-11T08:30:43.881Z",
+      "endedAtUpperBound": "2026-09-11T08:30:54.512Z"
+    },
+    {
+      "id": "e51",
+      "sha256": "54a0ea1abe1362d943e87c779c2304c17121c057dc65d0958a9ee50bff18d286",
+      "startedAt": "2026-09-11T08:30:54.958Z",
+      "endedAtUpperBound": "2026-09-11T08:31:04.270Z"
+    },
+    {
+      "id": "e52",
+      "sha256": "87160f1eba6715324dee04d9d06c0d05c88f1f5fc5177ef9a99da3d44ef1cb9a",
+      "startedAt": "2026-09-11T08:31:04.876Z",
+      "endedAtUpperBound": "2026-09-11T08:31:14.894Z"
+    },
+    {
+      "id": "e53",
+      "sha256": "675a44e3ce609b405594c03cb37d1214f185e5e24061f715f1f8489995ff5a63",
+      "startedAt": "2026-09-11T08:31:15.556Z",
+      "endedAtUpperBound": "2026-09-11T08:31:30.183Z"
+    },
+    {
+      "id": "e54",
+      "sha256": "115295525716732a991b5022cf66a7349bb94b01da26a5481ef7b4d13416728d",
+      "startedAt": "2026-09-11T08:18:27.269Z",
+      "endedAtUpperBound": "2026-09-11T08:20:13.212Z"
+    },
+    {
+      "id": "e55",
+      "sha256": "28992818b12287ca9c77cdfb766726efab0126c74fd3c1b1f8850560fe3e4780",
+      "startedAt": "2026-09-11T11:10:24.002Z",
+      "endedAtUpperBound": "2026-09-11T11:13:24.765Z"
+    },
+    {
+      "id": "e56",
+      "sha256": "cd90c7e64691a5b534efb2a81a8806b688045f49a6751a3ffa3a9aaeaba5b55d",
+      "startedAt": "2026-09-11T08:31:30.194Z",
+      "endedAtUpperBound": "2026-09-11T08:31:37.646Z"
+    },
+    {
+      "id": "e57",
+      "sha256": "595dc9b78917ff9c01e83f64ba6cd764e5ec075110cd2e11d4f6ad1d37beb884",
+      "startedAt": "2026-09-11T08:31:37.777Z",
+      "endedAtUpperBound": "2026-09-11T08:31:46.128Z"
+    },
+    {
+      "id": "e58",
+      "sha256": "f259a89501cefa7aae42aad92726791d83510cb8a63470bbcbbd731dd7a8ae30",
+      "startedAt": "2026-09-11T08:31:46.587Z",
+      "endedAtUpperBound": "2026-09-11T08:31:54.697Z"
+    },
+    {
+      "id": "e59",
+      "sha256": "11365524532686e626a1ad93bed4728d21713502495de0405401585ade2a3748",
+      "startedAt": "2026-09-11T08:31:55.008Z",
+      "endedAtUpperBound": "2026-09-11T08:32:02.651Z"
+    },
+    {
+      "id": "e60",
+      "sha256": "fbb20e43a5c9443fc59d25e33dad4c3b388c8fb019f934535c62438af3187bd1",
+      "startedAt": "2026-09-11T08:32:03.022Z",
+      "endedAtUpperBound": "2026-09-11T08:32:14.991Z"
+    },
+    {
+      "id": "e61",
+      "sha256": "91f0f6f416682d1b2bb1d47691635e3ec96bafbcc1b57074c9d93de2ef878ada",
+      "startedAt": "2026-09-11T08:19:01.268Z",
+      "endedAtUpperBound": "2026-09-11T08:19:31.094Z"
+    },
+    {
+      "id": "e62",
+      "sha256": "d6b0c88810401a89f21f7299e47ab58a75f4b7e5a0aa7dd41ad35ee690ba9d4c",
+      "startedAt": "2026-09-11T08:32:15.292Z",
+      "endedAtUpperBound": "2026-09-11T08:32:27.247Z"
+    },
+    {
+      "id": "e63",
+      "sha256": "bc06c1f3fb2ad78ae754b037ab431477f6076f391a271d0658375a59a43b266c",
+      "startedAt": "2026-09-11T08:32:16.859Z",
+      "endedAtUpperBound": "2026-09-11T08:32:27.869Z"
+    },
+    {
+      "id": "e64",
+      "sha256": "54e41ecd869ffaa2905933935c3845386d0ea114eebcb252c495a52ca732810d",
+      "startedAt": "2026-09-11T08:32:27.668Z",
+      "endedAtUpperBound": "2026-09-11T08:32:39.611Z"
+    },
+    {
+      "id": "e65",
+      "sha256": "3cb391ccf651157cbdbedd3d3331d537baed1bd6b773037ef57416604bbc7e02",
+      "startedAt": "2026-09-11T08:32:28.069Z",
+      "endedAtUpperBound": "2026-09-11T08:32:35.881Z"
+    },
+    {
+      "id": "e66",
+      "sha256": "f5b6b2912e8181e813f00f24e79056ba2c85c69a58047534a2e7884eadfac9cb",
+      "startedAt": "2026-09-11T08:32:36.103Z",
+      "endedAtUpperBound": "2026-09-11T08:32:46.134Z"
+    },
+    {
+      "id": "e67",
+      "sha256": "099b0cd277ccdae5796c3bdfd7b6e4d7fe7e49ec1c4a75ea5e6ea33de8d0aa5d",
+      "startedAt": "2026-09-11T08:19:29.852Z",
+      "endedAtUpperBound": "2026-09-11T08:20:11.836Z"
+    },
+    {
+      "id": "e68",
+      "sha256": "2dcaa569ac94425d532bcda7bf69f3d4332bc00c78e6be4ac21d24e98af83e50",
+      "startedAt": "2026-09-11T08:32:39.971Z",
+      "endedAtUpperBound": "2026-09-11T08:32:48.586Z"
+    },
+    {
+      "id": "e69",
+      "sha256": "c0942bd913bf7e6d88a7212198c20c8316a4c07e52967adea84413d5769b2c9f",
+      "startedAt": "2026-09-11T08:32:46.503Z",
+      "endedAtUpperBound": "2026-09-11T08:32:53.856Z"
+    },
+    {
+      "id": "e70",
+      "sha256": "8a3fdc10f87fd626aceb55993242217e13b7038fe2fb0549b623d56c94830fa3",
+      "startedAt": "2026-09-11T08:32:48.882Z",
+      "endedAtUpperBound": "2026-09-11T08:34:31.207Z"
+    },
+    {
+      "id": "e71",
+      "sha256": "f0e7bb263f77680a4d3bd6dbef314167c0b96b3f0522ecabe0aab73a18cce127",
+      "startedAt": "2026-09-11T08:32:54.248Z",
+      "endedAtUpperBound": "2026-09-11T08:33:01.440Z"
+    },
+    {
+      "id": "e72",
+      "sha256": "b5a9a61af2e5d9506a9ccbabcd5656a78a1467f2a16e023b6377a8c2c00a5d55",
+      "startedAt": "2026-09-11T08:33:01.718Z",
+      "endedAtUpperBound": "2026-09-11T08:33:08.348Z"
+    },
+    {
+      "id": "e73",
+      "sha256": "d5e54dce2314623f6f921d0d84c218d1b337dd2efff4e883af748acb60ef0d71",
+      "startedAt": "2026-09-11T08:20:10.350Z",
+      "endedAtUpperBound": "2026-09-11T08:20:30.159Z"
+    },
+    {
+      "id": "e74",
+      "sha256": "b389dbe5ae971220b30ee0589eb82b9e6e95ef4264a05e9e3fd207f3af7e2801",
+      "startedAt": "2026-09-11T08:33:08.783Z",
+      "endedAtUpperBound": "2026-09-11T08:36:09.175Z"
+    },
+    {
+      "id": "e75",
+      "sha256": "7558a78b8bc89515131f2f1b619504b451c76686f74a45a441ca835ab6361595",
+      "startedAt": "2026-09-11T08:34:32.311Z",
+      "endedAtUpperBound": "2026-09-11T08:37:32.809Z"
+    },
+    {
+      "id": "e76",
+      "sha256": "25e681bc62ae1e723c81fe4cd810173608e648ff51fca0d5ab397dca75431cd1",
+      "startedAt": "2026-09-11T08:36:10.142Z",
+      "endedAtUpperBound": "2026-09-11T08:39:10.697Z"
+    },
+    {
+      "id": "e77",
+      "sha256": "fff8aa93cda7b832bb9a7c882acca4d699d522159460a382d42a35d0ec7be718",
+      "startedAt": "2026-09-11T08:37:38.482Z",
+      "endedAtUpperBound": "2026-09-11T08:40:39.191Z"
+    },
+    {
+      "id": "e78",
+      "sha256": "2d38adfcbd58efe3c3b0f89a93a9edb26a1f9eb6b37e46665e5d26db42587036",
+      "startedAt": "2026-09-11T08:39:11.585Z",
+      "endedAtUpperBound": "2026-09-11T08:42:12.046Z"
+    },
+    {
+      "id": "e79",
+      "sha256": "78301238ff6463e4193da7c8d43e401b790fec48890da53cb081327e7027f21d",
+      "startedAt": "2026-09-11T08:20:11.076Z",
+      "endedAtUpperBound": "2026-09-11T08:23:11.478Z"
+    }
+  ],
+  "disclaimers": [
+    "候选版实测，未部署到正式服务。",
+    "参数接受/透传不等于五档推理质量提升。",
+    "历史观察与加强身份链验证分列；不得全部渲染为绿色支持。",
+    "11个模型历史Ultracode通过不构成稳定性保证；保留重试与超时。",
+    "SDK协议模式测试不替代Desktop按钮端到端测试。"
+  ]
+}

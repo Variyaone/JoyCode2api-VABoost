@@ -21,6 +21,12 @@
 
 ---
 
+## Variya 工作台
+
+本分支由 [Variya](https://github.com/Variyaone/JoyCode2Api) 维护。新一轮预览按消费视角组织为参考费用、总 Token、请求次数、平均每次 Token 四项概览；每日 Token／参考费用／请求趋势直接放在首页，随后展示模型消耗排行和日期 × 00–23 小时热力图。Overview / Models 与 All / 30d / 7d 共用真实账本日期范围。小时记录来自现存请求日志，并与每日账本校核；缺失记录不填零、不将日总量均摊到小时。字体统一、主内容居中，粒子与轻视差仅在标题可见且允许动态时运行。原运行明细、公开评测及模型审计证据继续保留为次级工具。该轮改动尚未覆盖本地正式版本。
+
+基于 [vibe-coding-labs / JoyCode2Api](https://github.com/vibe-coding-labs/JoyCode2Api)，感谢上游维护者 [CC11001100](https://github.com/CC11001100) 及贡献者。上游源码版本为 **0.6.1**，基线提交为 [176ca9d（2026-07-15）](https://github.com/vibe-coding-labs/JoyCode2Api/commit/176ca9d4d7f98e46a5d979be4cd61b4bc0470b0f)，不是对上游 v0.6.1 发布标签的精确复刻。本分支保留 Apache-2.0 许可证及原有版权，独立界面不代表上游背书。
+
 ## 概述
 
 JoyCode（京东 AI 编程助手）背后挂了 GLM、Kimi、MiniMax、Doubao、Claude-Opus 等模型，但它的 API 是私有协议，主流编程工具接不上。JoyCode2Api 在中间做协议翻译，对外同时暴露两套标准协议：

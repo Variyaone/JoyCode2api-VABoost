@@ -1,3 +1,4 @@
+// Modified by Variya 2026-09-11: restrained light UI; form behavior unchanged.
 import React, { useEffect, useState } from 'react';
 import {
   Card, Form, Input, Button, InputNumber, Select, Switch, message, Modal,
@@ -203,9 +204,9 @@ const SettingsPage: React.FC = () => {
     const label = (
       <Space size={4}>
         {field.label}
-        <Tooltip title={field.tooltip}><QuestionCircleOutlined style={{ color: '#bbb' }} /></Tooltip>
+        <Tooltip title={field.tooltip}><QuestionCircleOutlined style={{ color: '#646B78' }} /></Tooltip>
         {field.tag && (
-          <Tag color={field.tag === '已生效' ? 'success' : 'default'} style={{ marginLeft: 4, fontSize: 11 }}>
+          <Tag color={field.tag === '已生效' ? 'success' : 'default'} style={{ marginLeft: 4, fontSize: 12 }}>
             {field.tag === '已生效' ? <CheckCircleOutlined /> : <InfoCircleOutlined />} {field.tag}
           </Tag>
         )}

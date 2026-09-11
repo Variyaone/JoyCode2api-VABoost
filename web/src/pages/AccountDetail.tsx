@@ -1,3 +1,4 @@
+// Modified by Variya 2026-09-11: restrained light UI and accessible chart encoding.
 import React, { useEffect, useState } from 'react';
 import {
   Alert, Card, Row, Col, Statistic, Typography, Skeleton, Tag, Select, Button,
@@ -12,7 +13,7 @@ import {
 } from '@ant-design/icons';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
+  ResponsiveContainer, LineChart, Line,
 } from 'recharts';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, accountDisplayName } from '../api';
@@ -20,6 +21,7 @@ import type { Account, AccountStats, ModelInfo, RequestLog } from '../api';
 import SvgClaudeCode from '../components/ClaudeCodeIcon';
 import SvgCodex from '../components/CodexIcon';
 import CommandTooltip from '../components/CommandTooltip';
+import { colors } from '../theme';
 
 const BUILTIN_MODELS = [
   { label: 'JoyAI-Code-1.5（推荐）', value: 'JoyAI-Code-1.5' },
@@ -38,22 +40,31 @@ const BUILTIN_MODELS = [
 
 const isClaudeModel = (model?: string) => Boolean(model && model.toLowerCase().startsWith('claude'));
 
-const PIE_COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#A855F7', '#06B6D4', '#EC4899', '#84CC16'];
-
 const CHART_COLORS = {
-  primary: '#22C55E',
-  secondary: '#3B82F6',
-  danger: '#EF4444',
-  warning: '#F59E0B',
-  grid: '#1F2937',
-  axis: '#475569',
+  primary: colors.accent,
+  secondary: colors.muted,
+  danger: colors.danger,
+  grid: colors.grid,
+  axis: colors.muted,
 };
 
-const latencyColor = (ms: number) => {
-  if (ms < 500) return '#22C55E';
-  if (ms < 1500) return '#F59E0B';
-  return '#EF4444';
+const chartTooltipStyle: React.CSSProperties = {
+  background: '#FFFFFF', border: '1px solid #E1E4EA', borderRadius: 8,
+  color: '#252A34', fontSize: 12,
 };
+
+const categoryTick = (label: string) => label.length > 14 ? `${label.slice(0, 12)}…` : label;
+
+const ChartLegend = ({ items }: { items: { label: string; color: string; dashed?: boolean }[] }) => (
+  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 12, color: '#646B78', fontSize: 12 }}>
+    {items.map(({ label, color, dashed }) => (
+      <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span aria-hidden="true" style={{ width: 20, borderTop: `2px ${dashed ? 'dashed' : 'solid'} ${color}` }} />
+        {label}
+      </span>
+    ))}
+  </div>
+);
 
 const fmtTokens = (n: number) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
@@ -238,7 +249,7 @@ const AccountDetail: React.FC = () => {
       key: 'time',
       width: 170,
       render: (t: string) => (
-        <Typography.Text style={{ fontSize: 12, fontFamily: 'monospace' }}>
+        <Typography.Text style={{ fontSize: 12, fontFamily: 'var(--jc-font-ui)', fontVariantNumeric: 'tabular-nums' }}>
           {formatTime(t)}
         </Typography.Text>
       ),
@@ -283,7 +294,7 @@ const AccountDetail: React.FC = () => {
       width: 80,
       sorter: (a: RequestLog, b: RequestLog) => a.input_tokens - b.input_tokens,
       render: (n: number) => (
-        <Typography.Text style={{ fontSize: 12, fontFamily: 'monospace' }}>
+        <Typography.Text style={{ fontSize: 12, fontFamily: 'var(--jc-font-ui)', fontVariantNumeric: 'tabular-nums' }}>
           {n > 0 ? fmtTokens(n) : '-'}
         </Typography.Text>
       ),
@@ -295,7 +306,7 @@ const AccountDetail: React.FC = () => {
       width: 80,
       sorter: (a: RequestLog, b: RequestLog) => a.output_tokens - b.output_tokens,
       render: (n: number) => (
-        <Typography.Text style={{ fontSize: 12, fontFamily: 'monospace' }}>
+        <Typography.Text style={{ fontSize: 12, fontFamily: 'var(--jc-font-ui)', fontVariantNumeric: 'tabular-nums' }}>
           {n > 0 ? fmtTokens(n) : '-'}
         </Typography.Text>
       ),
@@ -307,7 +318,7 @@ const AccountDetail: React.FC = () => {
       width: 100,
       sorter: (a: RequestLog, b: RequestLog) => a.latency_ms - b.latency_ms,
       render: (ms: number) => (
-        <Typography.Text style={{ color: latencyColor(ms), fontFamily: 'monospace', fontWeight: 500 }}>
+        <Typography.Text style={{ color: '#252A34', fontFamily: 'var(--jc-font-ui)', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
           {formatLatency(ms)}
         </Typography.Text>
       ),
@@ -319,27 +330,27 @@ const AccountDetail: React.FC = () => {
       {/* Header */}
       <div style={{
         marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12,
-        borderBottom: '1px solid #1F2937', paddingBottom: 16, flexWrap: 'wrap',
+        borderBottom: '1px solid #E1E4EA', paddingBottom: 16, flexWrap: 'wrap',
       }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/accounts')} type="text" />
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <Typography.Title level={4} style={{ margin: 0 }}>{accountDisplayName(account)}</Typography.Title>
-            {account.is_default && <Tag color="blue">默认</Tag>}
+            {account.is_default && <Tag>默认</Tag>}
           </div>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {account.user_id} · 创建于 {account.created_at?.slice(0, 10) || '-'}
           </Typography.Text>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>Token:</Typography.Text>
-            <Typography.Text code copyable style={{ fontSize: 11 }}>
+            <Typography.Text code copyable style={{ fontSize: 12 }}>
               {account.api_token}
             </Typography.Text>
           </div>
           <div style={{ marginTop: 6 }}>
             {activeSessions > 0 ? (
-              <Badge status="processing" color="#22C55E" text={
-                <Typography.Text style={{ fontSize: 12, color: '#22C55E' }}>
+              <Badge status="processing" color="#5966A6" text={
+                <Typography.Text style={{ fontSize: 12, color: '#252A34' }}>
                   {activeSessions} 个活跃会话
                 </Typography.Text>
               } />
@@ -352,7 +363,7 @@ const AccountDetail: React.FC = () => {
         </div>
         <Space wrap>
           <Tooltip title="此模型的用途仅限生成下方的快速启动命令。实际请求中的模型由客户端指定（如 ANTHROPIC_MODEL 环境变量），始终优先于本设置。模型列表来自 JoyCode API 支持的模型 + 服务器动态获取的扩展模型。">
-            <QuestionCircleOutlined style={{ color: '#94A3B8', cursor: 'help' }} />
+            <QuestionCircleOutlined style={{ color: '#646B78', cursor: 'help' }} />
           </Tooltip>
           <Select
             style={{ width: 220 }}
@@ -367,7 +378,7 @@ const AccountDetail: React.FC = () => {
           />
           {isClaudeModel(account.default_model) && (
             <Tooltip title="Claude 模型需要本机登录 JoyCode IDE">
-              <InfoCircleOutlined style={{ color: '#F59E0B' }} />
+              <InfoCircleOutlined style={{ color: colors.warning }} />
             </Tooltip>
           )}
           <Button size="small" onClick={async () => {
@@ -418,7 +429,7 @@ const AccountDetail: React.FC = () => {
             快速启动命令
           </Typography.Text>
           <Tooltip title="模型优先级：客户端指定的模型（如启动命令中的 ANTHROPIC_MODEL）始终优先。上方设置的「默认模型」仅用于生成这些命令中的模型参数。如果你手动修改了启动命令中的模型，以你手动指定的为准。">
-            <Typography.Text style={{ fontSize: 12, color: '#94A3B8', cursor: 'help' }}>
+            <Typography.Text style={{ fontSize: 12, color: '#646B78', cursor: 'help' }}>
               <InfoCircleOutlined /> 模型优先级说明
             </Typography.Text>
           </Tooltip>
@@ -441,7 +452,7 @@ const AccountDetail: React.FC = () => {
                   />
                 </CommandTooltip>
               </div>
-              <pre style={{ margin: 0, fontFamily: 'inherit', fontSize: 11, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#cdd6f4' }}>
+              <pre style={{ margin: 0, fontFamily: 'var(--jc-font-code)', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#252A34' }}>
 {buildClaudeCodeCmd(account.api_token, account.default_model || undefined)}
               </pre>
             </div>
@@ -463,7 +474,7 @@ const AccountDetail: React.FC = () => {
                   />
                 </CommandTooltip>
               </div>
-              <pre style={{ margin: 0, fontFamily: 'inherit', fontSize: 11, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#cdd6f4' }}>
+              <pre style={{ margin: 0, fontFamily: 'var(--jc-font-code)', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#252A34' }}>
 {buildCodexCmd(account.api_token, account.default_model || undefined)}
               </pre>
             </div>
@@ -474,7 +485,7 @@ const AccountDetail: React.FC = () => {
       {/* Live session status */}
       <Card
         size="small"
-        style={{ marginBottom: 16, background: activeSessions > 0 ? 'rgba(34, 197, 94, 0.06)' : undefined, borderColor: activeSessions > 0 ? 'rgba(34, 197, 94, 0.3)' : undefined }}
+        style={{ marginBottom: 16, background: '#FFFFFF', borderColor: '#E1E4EA' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Badge status={activeSessions > 0 ? 'processing' : 'default'} />
@@ -482,12 +493,12 @@ const AccountDetail: React.FC = () => {
             实时状态
           </Typography.Text>
           <Typography.Text style={{ fontSize: 13 }}>
-            当前有 <Typography.Text strong style={{ fontSize: 16, color: activeSessions > 0 ? '#22C55E' : undefined }}>{activeSessions}</Typography.Text> 个活跃连接
+            当前有 <Typography.Text strong style={{ fontSize: 16, color: '#252A34' }}>{activeSessions}</Typography.Text> 个活跃连接
           </Typography.Text>
           {activeSessions > 0 && (
-            <Tag color="blue">请求处理中</Tag>
+            <Tag>请求处理中</Tag>
           )}
-          <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 'auto' }}>
             每 5 秒自动刷新
           </Typography.Text>
         </div>
@@ -504,7 +515,7 @@ const AccountDetail: React.FC = () => {
             >
               <Row gutter={[8, 12]}>
                 <Col span={12}>
-                  <Statistic title="今日请求" value={stats.total_requests} valueStyle={{ fontSize: 20, color: CHART_COLORS.primary }} prefix={<ApiOutlined />} />
+                  <Statistic title="今日请求" value={stats.total_requests} valueStyle={{ fontSize: 20, color: '#252A34' }} prefix={<ApiOutlined />} />
                 </Col>
                 <Col span={12}>
                   <Statistic title="累计请求" value={stats.all_time?.total_requests ?? 0} valueStyle={{ fontSize: 20 }} />
@@ -514,9 +525,9 @@ const AccountDetail: React.FC = () => {
                     title="今日成功"
                     value={stats.success_count}
                     prefix={<CheckCircleOutlined />}
-                    valueStyle={{ fontSize: 18, color: CHART_COLORS.primary }}
+                    valueStyle={{ fontSize: 18, color: '#252A34' }}
                   />
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     占比 {stats.total_requests > 0 ? Math.round((stats.success_count / stats.total_requests) * 100) : 100}%
                   </Typography.Text>
                 </Col>
@@ -525,9 +536,9 @@ const AccountDetail: React.FC = () => {
                     title="今日失败"
                     value={stats.error_count}
                     prefix={<CloseCircleOutlined />}
-                    valueStyle={{ fontSize: 18, color: stats.error_count > 0 ? CHART_COLORS.danger : CHART_COLORS.primary }}
+                    valueStyle={{ fontSize: 18, color: stats.error_count > 0 ? CHART_COLORS.danger : '#252A34' }}
                   />
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     占比 {stats.total_requests > 0 ? Math.round((stats.error_count / stats.total_requests) * 100) : 0}%
                   </Typography.Text>
                 </Col>
@@ -541,7 +552,7 @@ const AccountDetail: React.FC = () => {
                         prefix={<SwapOutlined />}
                         valueStyle={{ fontSize: 16 }}
                       />
-                      <Tag color="blue" style={{ marginTop: 2 }}>
+                      <Tag style={{ marginTop: 2 }}>
                         {stats.total_requests > 0 ? Math.round((stats.stream_count / stats.total_requests) * 100) : 0}%
                       </Tag>
                     </Col>
@@ -551,7 +562,7 @@ const AccountDetail: React.FC = () => {
                         value={Math.round(stats.avg_latency_ms)}
                         suffix="ms"
                         prefix={<ThunderboltOutlined />}
-                        valueStyle={{ fontSize: 16, color: stats.avg_latency_ms < 500 ? CHART_COLORS.primary : stats.avg_latency_ms < 1500 ? CHART_COLORS.warning : CHART_COLORS.danger }}
+                        valueStyle={{ fontSize: 16, color: '#252A34' }}
                       />
                     </Col>
                   </Row>
@@ -571,7 +582,7 @@ const AccountDetail: React.FC = () => {
                   <Statistic
                     title="今日 Token"
                     value={fmtTokens(stats.total_input_tokens + stats.total_output_tokens)}
-                    valueStyle={{ fontSize: 20, color: CHART_COLORS.secondary }}
+                    valueStyle={{ fontSize: 20, color: '#252A34' }}
                   />
                 </Col>
                 <Col span={12}>
@@ -639,51 +650,58 @@ const AccountDetail: React.FC = () => {
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
           <Col xs={24} lg={12}>
             <Card size="small" title="24 小时请求趋势">
+              <ChartLegend items={[
+                { label: '请求数', color: CHART_COLORS.primary },
+                { label: '错误数', color: CHART_COLORS.danger, dashed: true },
+              ]} />
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={hourlyChartData} margin={{ left: -10 }}>
-                  <defs>
-                    <linearGradient id="gradDetailReq" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={CHART_COLORS.primary} stopOpacity={0.4} />
-                      <stop offset="100%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="gradDetailErr" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={CHART_COLORS.danger} stopOpacity={0.3} />
-                      <stop offset="100%" stopColor={CHART_COLORS.danger} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_COLORS.axis }} interval={2} stroke={CHART_COLORS.grid} />
-                  <YAxis tick={{ fontSize: 11, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
-                  <RTooltip contentStyle={{ background: '#0E1223', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#F8FAFC' }} />
-                  <Area type="monotone" dataKey="count" name="请求数" stroke={CHART_COLORS.primary} fill="url(#gradDetailReq)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="errors" name="错误数" stroke={CHART_COLORS.danger} fill="url(#gradDetailErr)" strokeWidth={1.5} />
-                </AreaChart>
+                <LineChart data={hourlyChartData} margin={{ left: -10, right: 12 }} accessibilityLayer>
+                  <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: CHART_COLORS.axis }} interval={2} stroke={CHART_COLORS.grid} />
+                  <YAxis tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} allowDecimals={false} />
+                  <RTooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#646B78' }} itemStyle={{ color: '#252A34' }} cursor={{ stroke: CHART_COLORS.grid }} />
+                  <Line type="monotone" dataKey="count" name="请求数" stroke={CHART_COLORS.primary} strokeWidth={2} dot={false} activeDot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2 }} />
+                  <Line type="monotone" dataKey="errors" name="错误数" stroke={CHART_COLORS.danger} strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2 }} />
+                </LineChart>
               </ResponsiveContainer>
             </Card>
           </Col>
           <Col xs={24} lg={12}>
             <Card size="small" title="24 小时 Token 消耗趋势">
+              <ChartLegend items={[
+                { label: '输入 Token', color: CHART_COLORS.primary },
+                { label: '输出 Token', color: CHART_COLORS.secondary, dashed: true },
+              ]} />
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={hourlyChartData} margin={{ left: -10 }}>
-                  <defs>
-                    <linearGradient id="gradDetailIn" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={CHART_COLORS.secondary} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={CHART_COLORS.secondary} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="gradDetailOut" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={CHART_COLORS.primary} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_COLORS.axis }} interval={2} stroke={CHART_COLORS.grid} />
-                  <YAxis tick={{ fontSize: 11, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
-                  <RTooltip contentStyle={{ background: '#0E1223', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#F8FAFC' }} />
-                  <Area type="monotone" dataKey="input_tokens" name="输入 Token" stroke={CHART_COLORS.secondary} fill="url(#gradDetailIn)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="output_tokens" name="输出 Token" stroke={CHART_COLORS.primary} fill="url(#gradDetailOut)" strokeWidth={2} />
-                </AreaChart>
+                <LineChart data={hourlyChartData} margin={{ left: -10, right: 12 }} accessibilityLayer>
+                  <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: CHART_COLORS.axis }} interval={2} stroke={CHART_COLORS.grid} />
+                  <YAxis tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} tickFormatter={fmtTokens} />
+                  <RTooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#646B78' }} itemStyle={{ color: '#252A34' }} cursor={{ stroke: CHART_COLORS.grid }} />
+                  <Line type="monotone" dataKey="input_tokens" name="输入 Token" stroke={CHART_COLORS.primary} strokeWidth={2} dot={false} activeDot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2 }} />
+                  <Line type="monotone" dataKey="output_tokens" name="输出 Token" stroke={CHART_COLORS.secondary} strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2 }} />
+                </LineChart>
               </ResponsiveContainer>
             </Card>
+          </Col>
+          <Col span={24}>
+            <details style={{ color: '#252A34', fontSize: 12 }}>
+              <summary style={{ cursor: 'pointer', padding: '8px 0' }}>查看 24 小时趋势数据</summary>
+              <Table
+                size="small"
+                dataSource={hourlyChartData}
+                rowKey="label"
+                pagination={false}
+                scroll={{ x: 560 }}
+                columns={[
+                  { title: '时间', dataIndex: 'label' },
+                  { title: '请求数', dataIndex: 'count', align: 'right' },
+                  { title: '错误数', dataIndex: 'errors', align: 'right' },
+                  { title: '输入 Token', dataIndex: 'input_tokens', align: 'right' },
+                  { title: '输出 Token', dataIndex: 'output_tokens', align: 'right' },
+                ]}
+              />
+            </details>
           </Col>
         </Row>
         );
@@ -695,40 +713,63 @@ const AccountDetail: React.FC = () => {
           {stats.by_model.length > 0 && (
             <Col xs={24} lg={14}>
               <Card size="small" title={<span className="jc-section-title"><FireOutlined />模型使用分布</span>}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={stats.by_model} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-                    <XAxis type="number" tick={{ fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
-                    <YAxis dataKey="model" type="category" width={100} tick={{ fontSize: 11, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
-                    <RTooltip contentStyle={{ background: '#0E1223', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#F8FAFC' }} />
-                    <Bar dataKey="count" name="请求数" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} />
+                <ResponsiveContainer width="100%" height={Math.max(180, stats.by_model.length * 36 + 40)}>
+                  <BarChart data={stats.by_model} layout="vertical" margin={{ left: 0, right: 16 }} accessibilityLayer>
+                    <CartesianGrid stroke={CHART_COLORS.grid} horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} allowDecimals={false} />
+                    <YAxis dataKey="model" type="category" width={110} tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} interval={0} tickFormatter={categoryTick} />
+                    <RTooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#646B78' }} itemStyle={{ color: '#252A34' }} cursor={{ fill: '#F5F6F8' }} />
+                    <Bar dataKey="count" name="请求数" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} maxBarSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
+                <details style={{ color: '#252A34', fontSize: 12 }}>
+                  <summary style={{ cursor: 'pointer', padding: '8px 0' }}>查看模型使用数据</summary>
+                  <Table
+                    size="small"
+                    dataSource={stats.by_model}
+                    rowKey="model"
+                    pagination={false}
+                    columns={[
+                      { title: '模型', dataIndex: 'model', render: (model: string) => <span style={{ overflowWrap: 'anywhere' }}>{model}</span> },
+                      { title: '请求数', dataIndex: 'count', align: 'right' },
+                    ]}
+                  />
+                </details>
               </Card>
             </Col>
           )}
           {endpointData.length > 0 && (
             <Col xs={24} lg={10}>
               <Card size="small" title={<span className="jc-section-title"><GlobalOutlined />端点调用分布</span>}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={endpointData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={70}
-                      label={({ name, percent }: any) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
-                      labelLine={{ stroke: '#475569', strokeWidth: 1 }}
-                    >
-                      {endpointData.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RTooltip contentStyle={{ background: '#0E1223', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#F8FAFC' }} />
-                  </PieChart>
+                <ResponsiveContainer width="100%" height={Math.max(180, endpointData.length * 36 + 40)}>
+                  <BarChart data={endpointData} layout="vertical" margin={{ left: 0, right: 16 }} accessibilityLayer>
+                    <CartesianGrid stroke={CHART_COLORS.grid} horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} allowDecimals={false} />
+                    <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} interval={0} tickFormatter={categoryTick} />
+                    <RTooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#646B78' }} itemStyle={{ color: '#252A34' }} cursor={{ fill: '#F5F6F8' }} />
+                    <Bar dataKey="value" name="请求数" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} maxBarSize={20} />
+                  </BarChart>
                 </ResponsiveContainer>
+                <details style={{ color: '#252A34', fontSize: 12 }}>
+                  <summary style={{ cursor: 'pointer', padding: '8px 0' }}>查看端点调用数据</summary>
+                  <Table
+                    size="small"
+                    dataSource={endpointData}
+                    rowKey="name"
+                    pagination={false}
+                    columns={[
+                      { title: '端点', dataIndex: 'name', render: (name: string) => <span style={{ overflowWrap: 'anywhere' }}>{name}</span> },
+                      { title: '请求数', dataIndex: 'value', align: 'right' },
+                      {
+                        title: '占比', align: 'right',
+                        render: (_: unknown, record: { value: number }) => {
+                          const total = endpointData.reduce((sum, item) => sum + item.value, 0);
+                          return `${total > 0 ? ((record.value / total) * 100).toFixed(0) : 0}%`;
+                        },
+                      },
+                    ]}
+                  />
+                </details>
               </Card>
             </Col>
           )}
@@ -740,7 +781,7 @@ const AccountDetail: React.FC = () => {
         size="small"
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ClockCircleOutlined style={{ color: '#22C55E' }} />
+            <ClockCircleOutlined style={{ color: '#646B78' }} />
             <span>请求日志</span>
             <Tag>{logs.length} 条</Tag>
           </div>
@@ -773,9 +814,9 @@ const AccountDetail: React.FC = () => {
                   <div style={{
                     marginBottom: 10,
                     padding: '10px 12px',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    border: '1px solid #E1E4EA',
                     borderRadius: 6,
-                    background: 'rgba(239, 68, 68, 0.08)',
+                    background: '#F5F6F8',
                   }}>
                     <Typography.Text strong style={{ display: 'block', marginBottom: 6, color: CHART_COLORS.danger }}>
                       错误详情
@@ -786,8 +827,8 @@ const AccountDetail: React.FC = () => {
                       wordBreak: 'break-word',
                       fontSize: 12,
                       lineHeight: 1.6,
-                      color: CHART_COLORS.danger,
-                      fontFamily: "'Fira Code', monospace",
+                      color: '#252A34',
+                      fontFamily: 'var(--jc-font-code)',
                     }}>
                       {record.error_message || `HTTP ${record.status_code}`}
                     </pre>

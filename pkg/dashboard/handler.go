@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -20,12 +21,12 @@ import (
 	"sync"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"github.com/vibe-coding-labs/JoyCode2Api/pkg/auth"
 	"github.com/vibe-coding-labs/JoyCode2Api/pkg/joycode"
 	"github.com/vibe-coding-labs/JoyCode2Api/pkg/keepalive"
 	"github.com/vibe-coding-labs/JoyCode2Api/pkg/proxy"
 	"github.com/vibe-coding-labs/JoyCode2Api/pkg/store"
+	_ "modernc.org/sqlite"
 )
 
 type Handler struct {
@@ -69,31 +70,81 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/model-capabilities", h.handleModelCapabilities)
 	mux.HandleFunc("/api/model-benchmarks", h.handleModelBenchmarks)
 	mux.HandleFunc("/api/costs", h.handleCosts)
+	mux.HandleFunc("/api/usage-activity", h.handleUsageActivity)
 	mux.HandleFunc("/api/recent-logs", h.handleRecentLogs)
 	mux.HandleFunc("/api/stats", h.handleStats)
 	mux.HandleFunc("/api/settings", h.handleSettings)
 	mux.HandleFunc("/api/health", h.handleHealth)
 	mux.HandleFunc("/api/errors", h.handleErrors)
-	mux.HandleFunc("/api/github-stars", h.handleGitHubStars)
+	mux.HandleFunc("/api/github-stars", h.handleRepoStars)
 	mux.HandleFunc("/api/accounts-export", h.handleExportAccounts)
 	mux.HandleFunc("/api/accounts-import", h.handleImportAccounts)
 }
 
-// GitHub Stars cache
-var (
-	ghStarsCache     int
-	ghStarsCacheTime time.Time
-	ghStarsMu        sync.Mutex
+// Repo Stars cache
+const ghStarsCacheTTL = 1 * time.Hour
+
+// Both repositories are this project's own mirrors; upstream attribution lives in the footer.
+const (
+	ghRepoOwnerPath    = "variyaone/JoyCode2api-VABoost"
+	giteeRepoOwnerPath = "variyaone/JoyCode2api-VABoost"
 )
 
-const ghStarsCacheTTL = 1 * time.Hour
-const ghRepo = "vibe-coding-labs/JoyCode2Api"
-
-// ghClient has a timeout so a slow/unreachable GitHub API can't hold a
+// ghClient has a timeout so a slow/unreachable forage API can't hold a
 // handler goroutine indefinitely.
 var ghClient = &http.Client{Timeout: 10 * time.Second}
 
-func (h *Handler) handleGitHubStars(w http.ResponseWriter, r *http.Request) {
+// starCounts caches both platforms with one timestamp; a failed platform keeps its last value.
+var (
+	starMu     sync.Mutex
+	starCached = map[string]int{}
+	starTime   time.Time
+)
+
+func fetchStarCount(ctx context.Context, platform, repoPath string) int {
+	client := ghClient
+	if platform == "gitee" {
+		// Gitee v5 is a public API; no token needed for stargazers_count.
+		resp, err := client.Get("https://gitee.com/api/v5/repos/" + repoPath)
+		if err != nil {
+			slog.Warn("gitee stars fetch failed", "error", err)
+			return starCached[platform]
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			slog.Warn("gitee stars non-200", "status", resp.StatusCode)
+			return starCached[platform]
+		}
+		var result struct {
+			StargazersCount int `json:"stargazers_count"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			slog.Warn("gitee stars decode failed", "error", err)
+			return starCached[platform]
+		}
+		return result.StargazersCount
+	}
+	resp, err := client.Get("https://api.github.com/repos/" + repoPath)
+	if err != nil {
+		slog.Warn("github stars fetch failed", "error", err)
+		return starCached[platform]
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		slog.Warn("github stars non-200", "status", resp.StatusCode)
+		return starCached[platform]
+	}
+	var result struct {
+		StargazersCount int `json:"stargazers_count"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		slog.Warn("github stars decode failed", "error", err)
+		return starCached[platform]
+	}
+	return result.StargazersCount
+}
+
+func (h *Handler) handleRepoStars(w http.ResponseWriter, r *http.Request) {
 	setCors(w)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
@@ -104,54 +155,27 @@ func (h *Handler) handleGitHubStars(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ghStarsMu.Lock()
-	if ghStarsCache > 0 && time.Since(ghStarsCacheTime) < ghStarsCacheTTL {
-		stars := ghStarsCache
-		ghStarsMu.Unlock()
-		writeJSON(w, http.StatusOK, map[string]interface{}{"stars": stars})
-		return
-	}
-	ghStarsMu.Unlock()
+	starMu.Lock()
+	fresh := time.Since(starTime) < ghStarsCacheTTL
+	github, gitee := starCached["github"], starCached["gitee"]
+	starMu.Unlock()
 
-	resp, err := ghClient.Get("https://api.github.com/repos/" + ghRepo)
-	if err != nil {
-		slog.Warn("github stars fetch failed", "error", err)
-		ghStarsMu.Lock()
-		stars := ghStarsCache
-		ghStarsMu.Unlock()
-		writeJSON(w, http.StatusOK, map[string]interface{}{"stars": stars})
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		slog.Warn("github stars non-200", "status", resp.StatusCode)
-		ghStarsMu.Lock()
-		stars := ghStarsCache
-		ghStarsMu.Unlock()
-		writeJSON(w, http.StatusOK, map[string]interface{}{"stars": stars})
-		return
+	if !fresh {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		github = fetchStarCount(ctx, "github", ghRepoOwnerPath)
+		gitee = fetchStarCount(ctx, "gitee", giteeRepoOwnerPath)
+		cancel()
+		starMu.Lock()
+		starCached = map[string]int{"github": github, "gitee": gitee}
+		starTime = time.Now()
+		starMu.Unlock()
 	}
 
-	var result struct {
-		StargazersCount int `json:"stargazers_count"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		slog.Warn("github stars decode failed", "error", err)
-		ghStarsMu.Lock()
-		stars := ghStarsCache
-		ghStarsMu.Unlock()
-		writeJSON(w, http.StatusOK, map[string]interface{}{"stars": stars})
-		return
-	}
-
-	ghStarsMu.Lock()
-	ghStarsCache = result.StargazersCount
-	ghStarsCacheTime = time.Now()
-	stars := ghStarsCache
-	ghStarsMu.Unlock()
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{"stars": stars})
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"github": github, "gitee": gitee,
+		"repos": map[string]string{"github": "https://github.com/" + ghRepoOwnerPath, "gitee": "https://gitee.com/" + giteeRepoOwnerPath},
+	})
 }
 
 // --- Errors Handler ---
@@ -191,16 +215,16 @@ func (h *Handler) handleErrors(w http.ResponseWriter, r *http.Request) {
 // commonly hit without the /v1/ prefix. When these paths arrive at the
 // SPA catch-all we return a JSON 404 with a helpful hint instead of HTML.
 var knownAPISet = map[string]bool{
-	"/chat/completions":      true,
-	"/completions":           true,
-	"/messages":              true,
-	"/models":                true,
-	"/embeddings":            true,
-	"/web-search":            true,
-	"/rerank":                true,
-	"/images/generations":    true,
-	"/audio/transcriptions":  true,
-	"/audio/translations":    true,
+	"/chat/completions":     true,
+	"/completions":          true,
+	"/messages":             true,
+	"/models":               true,
+	"/embeddings":           true,
+	"/web-search":           true,
+	"/rerank":               true,
+	"/images/generations":   true,
+	"/audio/transcriptions": true,
+	"/audio/translations":   true,
 }
 
 // ServeStatic serves the SPA frontend for non-API routes.
@@ -529,7 +553,11 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 		statuses := h.keeper.GetAllStatuses()
 		for i := range accounts {
 			if s, ok := statuses[accounts[i].UserID]; ok {
-				if s.Valid { accounts[i].CredentialValid = 1 } else { accounts[i].CredentialValid = 0 }
+				if s.Valid {
+					accounts[i].CredentialValid = 1
+				} else {
+					accounts[i].CredentialValid = 0
+				}
 				accounts[i].CredentialCheckedAt = s.LastChecked.Format("2006-01-02 15:04:05")
 				accounts[i].CredentialError = s.ErrorMessage
 			}
@@ -1338,14 +1366,14 @@ func modelInfos(models []string) []map[string]string {
 type ModelCapabilityRow struct {
 	ID            string `json:"id"`
 	ChatAPIModel  string `json:"chat_api_model"`
-	API           string `json:"api"`               // chat | responses | anthropic
-	Vision        bool   `json:"vision"`             // tested with base64 PNG
+	API           string `json:"api"`    // chat | responses | anthropic
+	Vision        bool   `json:"vision"` // tested with base64 PNG
 	Reasoning     bool   `json:"reasoning"`
-	WebSearch     bool   `json:"web_search"`          // built-in tool
+	WebSearch     bool   `json:"web_search"` // built-in tool
 	ImageGen      bool   `json:"image_gen"`
-	MaxOutput     int    `json:"max_output_tokens"`  // advertised respMaxTokens
-	AdvertisedCtx int    `json:"advertised_ctx"`      // upstream maxTotalTokens label
-	MeasuredCtx   int    `json:"measured_ctx"`        // verified by recall test
+	MaxOutput     int    `json:"max_output_tokens"` // advertised respMaxTokens
+	AdvertisedCtx int    `json:"advertised_ctx"`    // upstream maxTotalTokens label
+	MeasuredCtx   int    `json:"measured_ctx"`      // verified by recall test
 	Notes         string `json:"notes,omitempty"`
 }
 
@@ -1449,18 +1477,18 @@ func (h *Handler) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		"total_requests":       stats.TotalRequests,
-		"total_input_tokens":   stats.TotalInputTk,
-		"total_output_tokens":  stats.TotalOutputTk,
-		"accounts_count":       stats.AccountsCount,
-		"avg_latency_ms":       stats.AvgLatencyMs,
-		"error_count":          stats.ErrorCount,
-		"stream_count":         stats.StreamCount,
-		"success_count":        stats.SuccessCount,
-		"by_model":             stats.ByModel,
-		"by_account":           stats.ByAccount,
-		"all_time":             totals,
-		"hourly":               hourly,
+		"total_requests":      stats.TotalRequests,
+		"total_input_tokens":  stats.TotalInputTk,
+		"total_output_tokens": stats.TotalOutputTk,
+		"accounts_count":      stats.AccountsCount,
+		"avg_latency_ms":      stats.AvgLatencyMs,
+		"error_count":         stats.ErrorCount,
+		"stream_count":        stats.StreamCount,
+		"success_count":       stats.SuccessCount,
+		"by_model":            stats.ByModel,
+		"by_account":          stats.ByAccount,
+		"all_time":            totals,
+		"hourly":              hourly,
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

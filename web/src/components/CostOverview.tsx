@@ -1,3 +1,5 @@
+// Modified by Variya, 2026-09-11: shared model identity and light presentation.
+import ModelLogo from './ModelLogo';
 import { useMemo } from 'react';
 import { Alert, Button, Card, Col, Row, Segmented, Skeleton, Statistic, Table, Typography } from 'antd';
 import type { CostRow, CostSnapshot } from '../api';
@@ -5,23 +7,6 @@ import { formatCost, money, summary } from '../utils/costs';
 import type { Currency } from '../utils/costs';
 import ResourceStatus from './ResourceStatus';
 import type { ResourceState } from './ResourceStatus';
-
-const modelLogo: Record<string, string> = {
-  'GLM': '/logo-glm.svg',
-  'Kimi': '/logo-kimi.svg',
-  'Claude': '/logo-claude.svg',
-  'GPT': '/logo-openai.svg',
-  'DeepSeek': '/logo-deepseek.svg',
-  'MiniMax': '/logo-minimax.svg',
-  'Doubao': '/logo-bytedance.svg',
-  'JoyAI': '/logo-jd.ico',
-  'JoyCode': '/logo-jd.ico',
-};
-
-function logoFor(model: string) {
-  const key = (Object.keys(modelLogo) as string[]).find(k => model.startsWith(k));
-  return key ? modelLogo[key] : null;
-}
 
 export default function CostOverview({ resource, currency, onCurrencyChange }: {
   resource: ResourceState & { data: CostSnapshot | null; initialLoading: boolean };
@@ -65,7 +50,7 @@ export default function CostOverview({ resource, currency, onCurrencyChange }: {
         <Col xs={24} xl={12}><Typography.Title level={5}>按模型累计估算</Typography.Title>
           <Table rowKey="model" size="small" pagination={false} scroll={{ x: 500 }} dataSource={byModel} columns={[
             { title: '模型', dataIndex: 'model', render: (m: string) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              {logoFor(m) && <img src={logoFor(m)!} alt="" width={22} height={22} style={{ flexShrink: 0, objectFit: 'contain' }} />}
+              <ModelLogo model={m} />
               <span>{m}</span></span> },
             { title: '费用（已知部分）', ...currencyCell, render: (_, r) => <span style={{ fontWeight: 600 }}>{fmt(r.rows, '—（未能估算）')}</span> },
             { title: '未知价 / 缺用量', ...currencyCell, render: (_, r) => `${summary(r.rows).unpriced} / ${summary(r.rows).missing}` },

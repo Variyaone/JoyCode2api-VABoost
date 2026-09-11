@@ -22,6 +22,16 @@ func TranslateRequest(req *MessageRequest, accountDefault string, systemDefault 
 		"stream":     req.Stream,
 		"max_tokens": req.MaxTokens,
 	}
+	effort := ""
+	if req.OutputConfig != nil {
+		effort = req.OutputConfig.Effort
+	}
+	if effort != "" {
+		body["reasoning_effort"] = effort
+	}
+	if thinking := joycode.ChatThinking(req.Thinking, model, effort); thinking != nil {
+		body["thinking"] = thinking
+	}
 	if req.Temperature != nil {
 		body["temperature"] = *req.Temperature
 	}
@@ -52,6 +62,12 @@ func TranslateAnthropicRequest(req *MessageRequest, accountDefault string, syste
 		"stream":     true,
 		"max_tokens": req.MaxTokens,
 		"thinking":   map[string]string{"type": "disabled"},
+	}
+	if req.Thinking != nil {
+		body["thinking"] = req.Thinking
+	}
+	if req.OutputConfig != nil {
+		body["output_config"] = req.OutputConfig
 	}
 	if req.System != nil {
 		body["system"] = normalizeAnthropicSystem(req.System)
@@ -198,6 +214,9 @@ func TranslateResponse(jcResp map[string]interface{}, reqModel string) *MessageR
 }
 
 func resolveModel(model string, accountDefault string, systemDefault string) string {
+	if joycode.IsCompletionOnlyModel(model) {
+		return model
+	}
 	for _, m := range joycode.Models {
 		if m == model {
 			return model
@@ -316,8 +335,8 @@ func convertAssistantBlocks(blocks []contentBlock) map[string]interface{} {
 	}
 
 	msg := map[string]interface{}{
-		"role":      "assistant",
-		"content":   strings.Join(textParts, "\n"),
+		"role":    "assistant",
+		"content": strings.Join(textParts, "\n"),
 	}
 	if len(toolCalls) > 0 {
 		msg["tool_calls"] = toolCalls
@@ -522,7 +541,7 @@ func convertToolChoice(raw json.RawMessage) interface{} {
 	case "tool":
 		if tc.Name != "" {
 			return map[string]interface{}{
-				"type": "function",
+				"type":     "function",
 				"function": map[string]string{"name": tc.Name},
 			}
 		}

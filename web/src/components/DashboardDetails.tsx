@@ -1,11 +1,13 @@
+// Modified by Variya, 2026-09-11: light charts and restrained data styling.
 import { Card, Col, Row, Statistic, Empty, Typography, Table, Tag, Divider, Tooltip as AntTooltip } from 'antd';
 import { ThunderboltOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, ApiOutlined, SwapOutlined, DashboardOutlined, FireOutlined, RiseOutlined, EyeOutlined, SearchOutlined, ExperimentOutlined, HistoryOutlined } from '@ant-design/icons';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { accountDisplayName } from '../api';
 import type { Stats, ModelCapability, RequestLog } from '../api';
+import { colors } from '../theme';
 import { fmt, fmtLatency, percentage } from '../utils/dashboard';
 
-const CHART_COLORS = { primary: '#3987E5', secondary: '#3987E5', danger: '#EF4444', warning: '#F59E0B', muted: '#F8FAFC', grid: '#1F2937', axis: '#94A3B8' };
+const CHART_COLORS = { primary: colors.accent, secondary: colors.accent, danger: colors.danger, warning: colors.warning, muted: colors.text, grid: colors.border, axis: colors.muted };
 
 export function MoreStats({ stats }: { stats: Stats }) {
   const successRate = percentage(stats.success_count, stats.total_requests);
@@ -26,7 +28,7 @@ export function MoreStats({ stats }: { stats: Stats }) {
           <Card size="small" style={{ height: '100%' }} title={<span className="jc-section-title"><ApiOutlined />请求统计</span>}>
             <Row gutter={[8, 12]}>
               <Col span={12}>
-                <Statistic title="今日请求" value={stats.total_requests} styles={{ content: { fontSize: 20, color: CHART_COLORS.primary } }} />
+                <Statistic title="今日请求" value={stats.total_requests} styles={{ content: { fontSize: 20, color: CHART_COLORS.muted } }} />
               </Col>
               <Col span={12}>
                 <Statistic title="累计请求" value={stats.all_time?.total_requests ?? 0} styles={{ content: { fontSize: 20 } }} />
@@ -36,9 +38,9 @@ export function MoreStats({ stats }: { stats: Stats }) {
                   title="今日成功"
                   value={stats.success_count}
                   prefix={<CheckCircleOutlined />}
-                  styles={{ content: { fontSize: 18, color: CHART_COLORS.primary } }}
+                  styles={{ content: { fontSize: 18, color: CHART_COLORS.muted } }}
                 />
-                <Typography.Text type="secondary" style={{ fontSize: 11 }}>占比 {successRate}</Typography.Text>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>占比 {successRate}</Typography.Text>
               </Col>
               <Col span={12}>
                 <Statistic
@@ -47,7 +49,7 @@ export function MoreStats({ stats }: { stats: Stats }) {
                   prefix={<CloseCircleOutlined />}
                   styles={{ content: { fontSize: 18, color: stats.error_count > 0 ? CHART_COLORS.danger : CHART_COLORS.primary } }}
                 />
-                <Typography.Text type="secondary" style={{ fontSize: 11 }}>占比 {errorRate}</Typography.Text>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>占比 {errorRate}</Typography.Text>
               </Col>
               <Col span={24}>
                 <Divider style={{ margin: '4px 0 8px' }} />
@@ -58,7 +60,7 @@ export function MoreStats({ stats }: { stats: Stats }) {
                     styles={{ content: { fontSize: 16 } }}
                     prefix={<SwapOutlined />}
                   />
-                  <Tag color="blue" style={{ height: 'fit-content', marginTop: 20 }}>{streamRate}</Tag>
+                  <Tag color="default" style={{ height: 'fit-content', marginTop: 20 }}>{streamRate}</Tag>
                 </div>
               </Col>
             </Row>
@@ -70,7 +72,7 @@ export function MoreStats({ stats }: { stats: Stats }) {
           <Card size="small" style={{ height: '100%' }} title={<span className="jc-section-title"><FireOutlined />Token 消费</span>}>
             <Row gutter={[8, 12]}>
               <Col span={12}>
-                <Statistic title="今日 Token" value={fmt(totalTokens)} styles={{ content: { fontSize: 20, color: CHART_COLORS.secondary } }} />
+                <Statistic title="今日 Token" value={fmt(totalTokens)} styles={{ content: { fontSize: 20, color: CHART_COLORS.muted } }} />
               </Col>
               <Col span={12}>
                 <Statistic title="累计 Token" value={fmt(allTimeTokens)} styles={{ content: { fontSize: 20 } }} />
@@ -147,12 +149,12 @@ export function MoreStats({ stats }: { stats: Stats }) {
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={modelData} layout="vertical" margin={{ left: 10 }}>
                       <CartesianGrid stroke={CHART_COLORS.grid} />
-                      <XAxis type="number" tick={{ fontSize: 11, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
-                      <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 11, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
+                      <XAxis type="number" tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
+                      <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
                       <Tooltip
-                        contentStyle={{ background: '#0E1223', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                        itemStyle={{ color: '#F8FAFC' }}
-                        labelStyle={{ color: '#94A3B8' }}
+                        contentStyle={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 12 }}
+                        itemStyle={{ color: colors.text }}
+                        labelStyle={{ color: colors.muted }}
                         formatter={(v: unknown) => [Number(v).toLocaleString(), '请求数']}
                       />
                       <Bar dataKey="value" name="请求数" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} />
@@ -162,14 +164,14 @@ export function MoreStats({ stats }: { stats: Stats }) {
                 <Col xs={24} md={10}>
                   <div style={{ padding: '4px 0 0 12px' }}>
                     {modelData.map((m) => (
-                      <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #1F2937' }}>
+                      <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${colors.border}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                           <div style={{ width: 8, height: 8, borderRadius: '50%', background: CHART_COLORS.primary, flexShrink: 0 }} />
                           <Typography.Text style={{ fontSize: 12 }} ellipsis>{m.name}</Typography.Text>
                         </div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', flexShrink: 0 }}>
                           <Typography.Text style={{ fontSize: 12, fontWeight: 600 }} className="jc-mono">{m.value.toLocaleString()}</Typography.Text>
-                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>{m.pct}%</Typography.Text>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>{m.pct}%</Typography.Text>
                         </div>
                       </div>
                     ))}
@@ -191,12 +193,12 @@ export function MoreStats({ stats }: { stats: Stats }) {
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={accountData}>
                       <CartesianGrid stroke={CHART_COLORS.grid} />
-                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
-                      <YAxis tick={{ fontSize: 11, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
+                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
+                      <YAxis tick={{ fontSize: 12, fill: CHART_COLORS.axis }} stroke={CHART_COLORS.grid} />
                       <Tooltip
-                        contentStyle={{ background: '#0E1223', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                        itemStyle={{ color: '#F8FAFC' }}
-                        labelStyle={{ color: '#94A3B8' }}
+                        contentStyle={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, fontSize: 12 }}
+                        itemStyle={{ color: colors.text }}
+                        labelStyle={{ color: colors.muted }}
                         formatter={(v: unknown) => [Number(v).toLocaleString(), '请求数']}
                       />
                       <Bar dataKey="value" name="请求数" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
@@ -206,14 +208,14 @@ export function MoreStats({ stats }: { stats: Stats }) {
                 <Col xs={24} md={10}>
                   <div style={{ padding: '4px 0 0 12px' }}>
                     {accountData.map((a) => (
-                      <div key={a.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #1F2937' }}>
+                      <div key={a.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${colors.border}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                           <div style={{ width: 8, height: 8, borderRadius: '50%', background: CHART_COLORS.primary, flexShrink: 0 }} />
                           <Typography.Text style={{ fontSize: 12 }} ellipsis>{a.name}</Typography.Text>
                         </div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', flexShrink: 0 }}>
                           <Typography.Text style={{ fontSize: 12, fontWeight: 600 }} className="jc-mono">{a.value.toLocaleString()}</Typography.Text>
-                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>{a.pct}%</Typography.Text>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>{a.pct}%</Typography.Text>
                         </div>
                       </div>
                     ))}
@@ -238,7 +240,7 @@ export function CapabilityRecords({ caps }: { caps: ModelCapability[] }) {
           size="small"
           style={{ marginTop: 16 }}
           title={<span className="jc-section-title"><ExperimentOutlined />通道能力记录（历史探测）</span>}
-          extra={<Typography.Text type="secondary" style={{ fontSize: 11 }}>非公开评分；空值表示未验证，成功输入量不是完整能力上限</Typography.Text>}
+          extra={<Typography.Text type="secondary" style={{ fontSize: 12 }}>非公开评分；空值表示未验证，成功输入量不是完整能力上限</Typography.Text>}
         >
           <Table
             dataSource={caps}
@@ -260,7 +262,7 @@ export function CapabilityRecords({ caps }: { caps: ModelCapability[] }) {
                 key: 'api',
                 width: 100,
                 render: (a: string) => (
-                  <Tag color={a === 'anthropic' ? 'purple' : a === 'responses' ? 'cyan' : 'green'}>{a}</Tag>
+                  <Tag color="default">{a}</Tag>
                 ),
               },
               {
@@ -268,7 +270,7 @@ export function CapabilityRecords({ caps }: { caps: ModelCapability[] }) {
                 key: 'vision',
                 width: 80,
                 render: (_: unknown, r: ModelCapability) => r.vision
-                  ? <Tag color="blue" icon={<EyeOutlined />}>视觉记录</Tag>
+                  ? <Tag color="default" icon={<EyeOutlined />}>视觉记录</Tag>
                   : <Typography.Text type="secondary">未确认</Typography.Text>,
               },
               {
@@ -276,7 +278,7 @@ export function CapabilityRecords({ caps }: { caps: ModelCapability[] }) {
                 key: 'reasoning',
                 width: 70,
                 render: (_: unknown, r: ModelCapability) => r.reasoning
-                  ? <Tag color="orange">✓</Tag>
+                  ? <Tag color="default">✓</Tag>
                   : <Typography.Text type="secondary">-</Typography.Text>,
               },
               {
@@ -284,7 +286,7 @@ export function CapabilityRecords({ caps }: { caps: ModelCapability[] }) {
                 key: 'web_search',
                 width: 90,
                 render: (_: unknown, r: ModelCapability) => r.web_search
-                  ? <Tag color="geekblue" icon={<SearchOutlined />}>内置</Tag>
+                  ? <Tag color="default" icon={<SearchOutlined />}>内置</Tag>
                   : <Typography.Text type="secondary">-</Typography.Text>,
               },
               {
@@ -308,7 +310,7 @@ export function CapabilityRecords({ caps }: { caps: ModelCapability[] }) {
                 dataIndex: 'notes',
                 key: 'notes',
                 render: (n: string) => n
-                  ? <Typography.Text type="secondary" style={{ fontSize: 11 }}>{n}</Typography.Text>
+                  ? <Typography.Text type="secondary" style={{ fontSize: 12 }}>{n}</Typography.Text>
                   : null,
               },
             ]}
@@ -341,7 +343,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 key: 'created_at',
                 width: 150,
                 render: (t: string) => (
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>{t}</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{t}</Typography.Text>
                 ),
               },
               {
@@ -349,7 +351,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 dataIndex: 'model',
                 key: 'model',
                 width: 150,
-                render: (m: string) => <Tag style={{ fontSize: 11 }}>{m}</Tag>,
+                render: (m: string) => <Tag style={{ fontSize: 12 }}>{m}</Tag>,
               },
               {
                 title: '端点',
@@ -357,7 +359,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 key: 'endpoint',
                 width: 140,
                 render: (e: string) => (
-                  <Typography.Text code style={{ fontSize: 10 }}>{e}</Typography.Text>
+                  <Typography.Text code style={{ fontSize: 12 }}>{e}</Typography.Text>
                 ),
               },
               {
@@ -365,7 +367,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 dataIndex: 'stream',
                 key: 'stream',
                 width: 70,
-                render: (s: boolean) => s ? <Tag color="blue">流式</Tag> : <Tag>非流</Tag>,
+                render: (s: boolean) => s ? <Tag color="default">流式</Tag> : <Tag>非流</Tag>,
               },
               {
                 title: '状态',
@@ -373,7 +375,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 key: 'status_code',
                 width: 70,
                 render: (c: number) => (
-                  <Tag color={c < 400 ? 'success' : 'error'} className="jc-mono">{c}</Tag>
+                  <Tag color={c < 400 ? 'default' : 'error'} className="jc-mono">{c}</Tag>
                 ),
               },
               {
@@ -382,7 +384,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 key: 'latency_ms',
                 width: 80,
                 render: (ms: number) => (
-                  <span className="jc-mono" style={{ fontSize: 11, color: ms > 30000 ? '#EF4444' : ms > 10000 ? '#F59E0B' : undefined }}>
+                  <span className="jc-mono" style={{ fontSize: 12, color: ms > 30000 ? colors.danger : ms > 10000 ? colors.warning : undefined }}>
                     {fmtLatency(ms)}
                   </span>
                 ),
@@ -392,7 +394,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 key: 'tokens',
                 width: 110,
                 render: (_: unknown, r: RequestLog) => (
-                  <span className="jc-mono" style={{ fontSize: 11 }}>
+                  <span className="jc-mono" style={{ fontSize: 12 }}>
                     {r.input_tokens > 0 ? fmt(r.input_tokens) : '-'} / {r.output_tokens > 0 ? fmt(r.output_tokens) : '-'}
                   </span>
                 ),
@@ -403,7 +405,7 @@ export function RecentRequests({ recentLogs }: { recentLogs: RequestLog[] }) {
                 key: 'error_message',
                 ellipsis: true,
                 render: (e: string) => e
-                  ? <Typography.Text type="danger" style={{ fontSize: 11 }}>{e}</Typography.Text>
+                  ? <Typography.Text type="danger" style={{ fontSize: 12 }}>{e}</Typography.Text>
                   : null,
               },
             ]}

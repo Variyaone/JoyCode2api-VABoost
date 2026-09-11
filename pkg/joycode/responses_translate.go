@@ -21,19 +21,21 @@ func ChatToResponses(chatBody map[string]interface{}) map[string]interface{} {
 		"model":  chatBody["model"],
 		"stream": chatBody["stream"],
 	}
-	// Reasoning models burn tokens on reasoning before emitting any text; a
-	// small max_tokens (e.g. 50) yields an empty response with
-	// incomplete_details.reason=max_output_tokens. The IDE omits the param
-	// entirely; do the same unless the caller asks for a comfortable budget.
+	if reasoning := responsesReasoning(chatBody); len(reasoning) > 0 {
+		body["reasoning"] = reasoning
+	}
+	// Honor every explicit positive output limit, including small budgets.
+	// Reasoning may consume that budget before producing text, but removing
+	// the limit would silently exceed the caller's requested token allowance.
 	if mt, ok := chatBody["max_tokens"]; ok {
 		switch v := mt.(type) {
 		case int:
-			if v >= 4096 {
+			if v > 0 {
 				body["max_output_tokens"] = v
 			}
 		case float64:
-			if v >= 4096 {
-				body["max_output_tokens"] = int(v)
+			if tokens := int(v); tokens > 0 && float64(tokens) == v {
+				body["max_output_tokens"] = tokens
 			}
 		}
 	}
@@ -160,6 +162,85 @@ func ChatToResponses(chatBody map[string]interface{}) map[string]interface{} {
 	return body
 }
 
+// ReasoningEffort reads a Responses-style reasoning object's effort without
+// coercing or normalizing its value. Callers can supply raw JSON or typed maps.
+func ReasoningEffort(raw interface{}) string {
+	effort, _ := jsonObject(raw)["effort"].(string)
+	return effort
+}
+
+// ChatThinking translates only the shared on/off control, not Claude's token
+// budget or adaptive-only options. Doubao requires enabled when effort is set;
+// an explicit disabled always wins over that implicit default.
+//
+// This is parameter transport, NOT a promise of five distinct reasoning levels.
+// The audit in tools/model-audit/upstream-matrix.json shows some chat providers
+// even accept invalid effort values. Doubao may fold xhigh/max into high. Keep
+// the caller's effort unchanged and leave validation/interpretation upstream.
+func ChatThinking(raw interface{}, model, effort string) map[string]interface{} {
+	thinking := jsonObject(raw)
+	if typ, ok := thinking["type"].(string); ok && typ != "" {
+		if typ == "adaptive" && !strings.HasPrefix(strings.ToLower(model), "minimax-") {
+			typ = "enabled"
+		}
+		return map[string]interface{}{"type": typ}
+	}
+	if raw == nil || thinking == nil {
+		if strings.EqualFold(model, "Doubao-Seed-2.0-pro") && effort != "" {
+			return map[string]interface{}{"type": "enabled"}
+		}
+	}
+	return nil
+}
+
+// responsesReasoning merges supported controls without leaking Anthropic
+// thinking/output_config (or budget_tokens) into GPT requests. Explicit OpenAI
+// reasoning_effort wins, then reasoning.effort, then output_config.effort. No
+// effort is invented for enabled/adaptive or a numeric token budget. If effort
+// is absent, explicit disabled maps to the Responses API's "none" value.
+func responsesReasoning(chatBody map[string]interface{}) map[string]interface{} {
+	reasoning := jsonObject(chatBody["reasoning"])
+	if reasoning == nil {
+		reasoning = map[string]interface{}{}
+	}
+	if effort, ok := chatBody["reasoning_effort"].(string); ok && effort != "" {
+		reasoning["effort"] = effort
+	} else if _, specified := reasoning["effort"]; !specified {
+		if effort := ReasoningEffort(chatBody["output_config"]); effort != "" {
+			reasoning["effort"] = effort
+		} else if jsonObject(chatBody["thinking"])["type"] == "disabled" {
+			reasoning["effort"] = "none"
+		}
+	}
+	return reasoning
+}
+
+// jsonObject returns a detached object, preserving raw nested values (including
+// large JSON numbers) and avoiding mutation of the caller's reasoning map.
+func jsonObject(raw interface{}) map[string]interface{} {
+	if object, ok := raw.(map[string]interface{}); ok {
+		copy := make(map[string]interface{}, len(object))
+		for key, value := range object {
+			copy[key] = value
+		}
+		return copy
+	}
+	if raw == nil {
+		return nil
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var object map[string]interface{}
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.UseNumber()
+	if decoder.Decode(&object) != nil {
+		return nil
+	}
+	return object
+}
+
 // TrimCallID caps call IDs at 64 chars (upstream rejects longer IDs; the IDE
 // keeps the tail).
 func TrimCallID(id string) string {
@@ -217,8 +298,27 @@ func ConvertChatTools(tools []interface{}) []interface{} {
 	return out
 }
 
+// normalizeChatContent handles typed Anthropic conversion and raw OpenAI parts
+// alike; otherwise a []map or RawMessage image/text array becomes debug text.
+func normalizeChatContent(raw interface{}) interface{} {
+	switch content := raw.(type) {
+	case json.RawMessage:
+		var decoded interface{}
+		if json.Unmarshal(content, &decoded) == nil {
+			return decoded
+		}
+	case []map[string]interface{}:
+		parts := make([]interface{}, len(content))
+		for i, part := range content {
+			parts[i] = part
+		}
+		return parts
+	}
+	return raw
+}
+
 func extractStringContent(raw interface{}) string {
-	switch c := raw.(type) {
+	switch c := normalizeChatContent(raw).(type) {
 	case nil:
 		return ""
 	case string:
@@ -244,7 +344,7 @@ func extractStringContent(raw interface{}) string {
 }
 
 func chatContentToParts(raw interface{}, textType string) interface{} {
-	switch c := raw.(type) {
+	switch c := normalizeChatContent(raw).(type) {
 	case string:
 		return []map[string]interface{}{{"type": textType, "text": c}}
 	case []interface{}:

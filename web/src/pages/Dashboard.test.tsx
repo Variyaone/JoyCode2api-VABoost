@@ -1,14 +1,16 @@
 import { ConfigProvider } from 'antd';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { useState } from 'react';
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { MemoryRouter, Outlet, Route, Routes, useOutletContext } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../api';
 import type { Account, BenchmarkSnapshot, CostSnapshot, RequestLog, Stats } from '../api';
 import { useRefreshableResource } from '../hooks/useRefreshableResource';
 import MainLayout from '../layouts/MainLayout';
 import type { DashboardOutletContext } from '../layouts/MainLayout';
-import Dashboard from './Dashboard';
+import ResourceStatus from '../components/ResourceStatus';
+import type { Currency } from '../utils/costs';
+import OperationsDetails from './OperationsDetails';
 
 // Keep the actual tab, table, resource-status and hook implementations. Charts
 // alone need layout/SVG facilities that jsdom does not provide.
@@ -76,12 +78,31 @@ function TestOutlet({ initiallyAutomatic = true }: { initiallyAutomatic?: boolea
   return <Outlet context={{ autoRefresh, setAutoRefresh, health } satisfies DashboardOutletContext} />;
 }
 
-function renderDashboard(options: { autoRefresh?: boolean; realLayout?: boolean } = {}) {
+// Mirror the Usage report's ownership contract without rendering/testing its UI:
+// costs poll independently of the inner operations tab; currency lives above it.
+// The output is a test-only probe of the owner, not a replacement overview KPI.
+function TestCostOwner() {
+  const { autoRefresh } = useOutletContext<DashboardOutletContext>();
+  const costResource = useRefreshableResource(api.getCosts, { autoRefresh });
+  const [currency, setCurrency] = useState<Currency>(() => localStorage.getItem('jc_cost_currency') === 'USD' ? 'USD' : 'CNY');
+  useEffect(() => { localStorage.setItem('jc_cost_currency', currency); }, [currency]);
+  return <>
+    <ResourceStatus label="用量账本" resource={costResource} />
+    <output data-testid="cost-owner">{JSON.stringify({ currency, data: costResource.data })}</output>
+    <OperationsDetails costs={costResource} currency={currency} onCurrencyChange={setCurrency} />
+  </>;
+}
+
+function ownerCosts(): { currency: Currency; data: CostSnapshot | null } {
+  return JSON.parse(screen.getByTestId('cost-owner').textContent!);
+}
+
+function renderOperations(options: { autoRefresh?: boolean; realLayout?: boolean } = {}) {
   return render(<ConfigProvider theme={{ token: { motion: false } }}>
     <MemoryRouter initialEntries={['/dashboard']}>
       <Routes>
         <Route element={options.realLayout ? <MainLayout /> : <TestOutlet initiallyAutomatic={options.autoRefresh ?? true} />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={<TestCostOwner />} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -120,8 +141,16 @@ function timestamp(label: string, root: ParentNode = document) {
   return resource(label, root).querySelector('[title]')?.getAttribute('title');
 }
 
-function kpi(label: string) {
-  const node = within(activePanel()).getByText(label, { selector: '.jc-overview-label' }).closest('.jc-overview-kpi');
+async function expandMoreStats() {
+  const toggle = within(activePanel()).getByRole('button', { name: '更多统计：累计用量、响应质量、模型与账号分布' });
+  if (toggle.getAttribute('aria-expanded') !== 'true') {
+    fireEvent.click(toggle);
+    await flush();
+  }
+}
+
+function statistic(label: string) {
+  const node = within(activePanel()).getByText(label, { selector: '.ant-statistic-title' }).closest('.ant-statistic');
   expect(node).not.toBeNull();
   return node!;
 }
@@ -167,7 +196,7 @@ beforeEach(() => {
   vi.spyOn(api, 'getModelBenchmarks').mockResolvedValue(benchmarks);
   vi.spyOn(api, 'getModelCapabilities').mockResolvedValue({ models: [], upstream_cap_ctx: 0, request_body_cap: 0, probed_at: '2026-09-09' });
   vi.spyOn(api, 'getHealth').mockResolvedValue({ status: 'ok', accounts: 1 });
-  vi.spyOn(api, 'getGitHubStars').mockResolvedValue(0);
+  vi.spyOn(api, 'getRepoStars').mockResolvedValue({ github: 0, gitee: 0, repos: { github: 'https://github.com/variyaone/JoyCode2api-VABoost', gitee: 'https://gitee.com/variyaone/JoyCode2api-VABoost' } });
 });
 
 afterEach(() => {
@@ -180,15 +209,31 @@ afterEach(() => {
 
 // Real Ant Design tables can exceed the 5s default on a busy Windows worker.
 // This is a per-suite wall-clock budget, not a change to fake polling intervals.
-describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
-  it('shares one cost load and currency between the live summary and real detail tables', async () => {
-    renderDashboard();
+describe('OperationsDetails resource lifecycle', { timeout: 15_000 }, () => {
+  it('keeps real layout navigation and independent attribution without duplicating API reads', async () => {
+    renderOperations({ realLayout: true });
+    await flush();
+    expect(screen.getByRole('heading', { name: '运行明细' })).toBeTruthy();
+    expect(screen.getByRole('navigation', { name: '主导航' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: '由 Variya 维护' })).toBeNull();
+    expect(screen.getByRole('link', { name: /vibe-coding-labs/ })).toBeTruthy();
+    expect(api.getRepoStars).toHaveBeenCalled();
+    expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 1, benchmarks: 0, capabilities: 0, health: 1 });
+    expect(screen.getByRole('link', { name: /176ca9d/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '打开导航' }));
+    await advance(200);
+    expect(screen.getByRole('menu')).toBeTruthy();
+    await tab('费用明细');
+    expect(screen.getByRole('heading', { name: '费用明细' })).toBeTruthy();
+    expect(api.getCosts).toHaveBeenCalledTimes(1);
+  });
+  it('shares the parent cost resource and currency with the real detail tables', async () => {
+    renderOperations();
     await flush();
     expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 1, benchmarks: 0, capabilities: 0, health: 1 });
-    expect(kpi('今日估算 · 人民币').textContent).toContain('¥7.20');
-    const originalStamp = timestamp('费用');
-    fireEvent.click(within(activePanel()).getByRole('button', { name: '明细' }));
-    await flush();
+    expect(ownerCosts()).toEqual({ currency: 'CNY', data: costs });
+    const originalStamp = timestamp('用量账本');
+    await tab('费用明细');
     expect(screen.getByRole('tab', { name: '费用明细' }).getAttribute('aria-selected')).toBe('true');
     expect(within(activePanel()).getAllByText('¥7.20').length).toBeGreaterThan(0);
     expect(within(activePanel()).getAllByText('¥21.60').length).toBeGreaterThan(0);
@@ -198,26 +243,34 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
     fireEvent.click(within(activePanel()).getByText('美元 $'));
     await flush();
     expect(localStorage.getItem('jc_cost_currency')).toBe('USD');
+    expect(ownerCosts()).toEqual({ currency: 'USD', data: costs });
     expect(within(activePanel()).getAllByText('$1.00').length).toBeGreaterThan(0);
+    expect(within(activePanel()).getAllByText('$3.00').length).toBeGreaterThan(0);
     await tab('运行概览');
-    expect(kpi('今日估算 · 美元').textContent).toContain('$1.00');
+    expect(ownerCosts().currency).toBe('USD');
     expect(api.getCosts).toHaveBeenCalledTimes(1);
 
     await tab('费用明细');
+    expect((within(activePanel()).getByRole('radio', { name: '美元 $' }) as HTMLInputElement).checked).toBe(true);
     await advance(5_000);
-    vi.mocked(api.getCosts).mockResolvedValue({ ...costs, rows: [{ ...costs.rows[0], amount_tenth_micro_usd: 40_000_000 }] });
+    const updatedCosts = { ...costs, rows: [{ ...costs.rows[0], amount_tenth_micro_usd: 40_000_000 }] };
+    vi.mocked(api.getCosts).mockResolvedValue(updatedCosts);
     fireEvent.click(within(activePanel()).getByRole('button', { name: '刷新费用' }));
     await flush();
-    expect(api.getCosts).toHaveBeenCalledTimes(2);
-    expect(api.getHealth).toHaveBeenCalledTimes(1);
+    expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 2, benchmarks: 0, capabilities: 0, health: 1 });
     expect(timestamp('费用', activePanel())).not.toBe(originalStamp);
+    expect(timestamp('费用', activePanel())).toBe(timestamp('用量账本'));
+    expect(ownerCosts()).toEqual({ currency: 'USD', data: updatedCosts });
+    expect(within(activePanel()).getAllByText('$4.00').length).toBeGreaterThan(0);
     await tab('运行概览');
-    expect(kpi('今日估算 · 美元').textContent).toContain('$4.00');
+    expect(ownerCosts()).toEqual({ currency: 'USD', data: updatedCosts });
+    await tab('费用明细');
+    expect(within(activePanel()).getAllByText('$4.00').length).toBeGreaterThan(0);
     expect(api.getCosts).toHaveBeenCalledTimes(2);
   });
 
   it('loads benchmark/capability snapshots only on first model-tab visit, never polls them, and refreshes only the active resources', async () => {
-    renderDashboard();
+    renderOperations();
     await flush();
     await tab('费用明细');
     await advance(30_000);
@@ -226,20 +279,23 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
     expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 2, benchmarks: 1, capabilities: 1, health: 2 });
     expect(screen.getByText('模型参考仅手动重读；代理连接继续定时检查。')).toBeTruthy();
     await advance(90_000);
-    expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 2, benchmarks: 1, capabilities: 1, health: 5 });
+    // The outer Usage report still owns/polls costs at 60s, 90s and 120s;
+    // the inner static model snapshots must not poll along with it.
+    expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 5, benchmarks: 1, capabilities: 1, health: 5 });
     expect(resource('公开评测', activePanel()).textContent).toContain('本地快照，不是实时探测');
     expect(resource('公开评测', activePanel()).textContent).not.toContain('数据可能过期');
     await refreshCurrent();
-    expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 2, benchmarks: 2, capabilities: 2, health: 6 });
+    expect(requestCounts()).toEqual({ stats: 1, accounts: 1, logs: 1, costs: 5, benchmarks: 2, capabilities: 2, health: 6 });
     await tab('运行概览');
-    expect(requestCounts()).toEqual({ stats: 2, accounts: 2, logs: 2, costs: 3, benchmarks: 2, capabilities: 2, health: 6 });
+    // Live resources catch up after being inactive, but the owner costs are fresh.
+    expect(requestCounts()).toEqual({ stats: 2, accounts: 2, logs: 2, costs: 5, benchmarks: 2, capabilities: 2, health: 6 });
     await tab('模型参考');
     expect(api.getModelBenchmarks).toHaveBeenCalledTimes(2);
     expect(api.getModelCapabilities).toHaveBeenCalledTimes(2);
   });
 
   it('retains ModelBenchmarks search, ascending sort, and display mode across tab switches and manual refresh', async () => {
-    renderDashboard();
+    renderOperations();
     await flush();
     await tab('模型参考');
     expect(modelOrder()).toEqual(['Atlas-high', 'Other-model', 'Atlas-low']);
@@ -265,13 +321,13 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
 
   it('isolates first-load live-stat failures so costs, accounts, logs and models remain usable, with a scoped retry', async () => {
     vi.mocked(api.getStats).mockRejectedValue(new Error('stats unavailable'));
-    renderDashboard();
+    renderOperations();
     await flush();
     expect(within(resource('运行统计')).getByText('运行统计读取失败')).toBeTruthy();
     expect(resource('运行统计').textContent).toContain('尚未读取');
     expect(timestamp('运行统计')).toBeUndefined();
-    expect(kpi('今日请求').textContent).toContain('—');
-    expect(kpi('今日估算 · 人民币').textContent).toContain('¥7.20');
+    expect(within(activePanel()).queryByRole('button', { name: '更多统计：累计用量、响应质量、模型与账号分布' })).toBeNull();
+    expect(ownerCosts()).toEqual({ currency: 'CNY', data: costs });
     expect(within(activePanel()).getByText('Retained account')).toBeTruthy();
     expect(within(activePanel()).getByText('Request-model-1')).toBeTruthy();
     await tab('费用明细');
@@ -285,13 +341,14 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
     await flush();
     expect(requestCounts()).toEqual({ ...before, stats: before.stats + 1 });
     expect(within(resource('运行统计')).queryByText('运行统计读取失败')).toBeNull();
-    expect(kpi('今日请求').textContent).toContain('125');
+    await expandMoreStats();
+    expect(statistic('今日请求').textContent).toContain('125');
   });
 
   it('keeps successful live data and genuine successful timestamps on later rejections, then advances only the retried resource', async () => {
-    renderDashboard();
+    renderOperations();
     await flush();
-    const labels = ['运行统计', '账号', '请求日志', '费用', '代理连接'];
+    const labels = ['运行统计', '账号', '请求日志', '用量账本', '代理连接'];
     const stamps = labels.map(label => timestamp(label));
     expect(stamps.every(Boolean)).toBe(true);
     vi.mocked(api.getStats).mockRejectedValue(new Error('stats unavailable'));
@@ -306,8 +363,9 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
       expect(resource(label).textContent).toContain('30 秒前更新');
     }
     expect(labels.map(label => timestamp(label))).toEqual(stamps);
-    expect(kpi('今日请求').textContent).toContain('125');
-    expect(kpi('今日估算 · 人民币').textContent).toContain('¥7.20');
+    await expandMoreStats();
+    expect(statistic('今日请求').textContent).toContain('125');
+    expect(ownerCosts()).toEqual({ currency: 'CNY', data: costs });
     expect(within(activePanel()).getByText('Retained account')).toBeTruthy();
     expect(within(activePanel()).getByText('Request-model-1')).toBeTruthy();
     await tab('费用明细');
@@ -318,7 +376,7 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
     vi.mocked(api.getStats).mockResolvedValue({ ...stats, total_requests: 126 });
     fireEvent.click(within(resource('运行统计')).getByRole('button', { name: /重\s*试/ }));
     await flush();
-    expect(kpi('今日请求').textContent).toContain('126');
+    expect(statistic('今日请求').textContent).toContain('126');
     expect(timestamp('运行统计')).toBe(new Date(Date.now()).toLocaleString('zh-CN'));
     expect(timestamp('运行统计')).not.toBe(stamps[0]);
     expect(resource('运行统计').textContent).not.toContain('数据可能过期');
@@ -326,7 +384,7 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
   });
 
   it('retains a benchmark snapshot and its read time if manual refresh fails', async () => {
-    renderDashboard();
+    renderOperations();
     await flush();
     await tab('模型参考');
     const originalStamp = timestamp('公开评测', activePanel());
@@ -345,7 +403,7 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
   });
 
   it('turns off all scheduled current-resource/header refreshes without faking freshness; manual refresh remains tab-scoped', async () => {
-    renderDashboard();
+    renderOperations();
     await flush();
     const originalStamp = timestamp('运行统计');
     fireEvent.click(screen.getByRole('switch', { name: '30 秒自动刷新' }));
@@ -374,7 +432,7 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
   });
 
   it('preserves the real recent-request table page across tab switches, polling and a failed refresh', async () => {
-    renderDashboard();
+    renderOperations();
     await flush();
     const recent = screen.getByRole('region', { name: '最近请求' });
     fireEvent.click(within(recent).getByTitle('2'));
@@ -397,7 +455,7 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
   it('aborts a deactivated live request and ignores its late completion while keeping costs usable', async () => {
     const old = deferred<Stats>();
     vi.mocked(api.getStats).mockReturnValueOnce(old.promise);
-    renderDashboard({ autoRefresh: false });
+    renderOperations({ autoRefresh: false });
     await flush();
     const oldSignal = vi.mocked(api.getStats).mock.calls[0][0]!;
     expect(oldSignal.aborted).toBe(false);
@@ -406,41 +464,47 @@ describe('Dashboard resource lifecycle', { timeout: 15_000 }, () => {
     expect(within(activePanel()).getAllByText('¥7.20').length).toBeGreaterThan(0);
     vi.mocked(api.getStats).mockResolvedValue({ ...stats, total_requests: 222 });
     await tab('运行概览');
-    expect(kpi('今日请求').textContent).toContain('222');
+    await expandMoreStats();
+    expect(statistic('今日请求').textContent).toContain('222');
     const newStamp = timestamp('运行统计');
     await advance(5_000);
     await act(async () => { old.resolve({ ...stats, total_requests: 999 }); });
-    expect(kpi('今日请求').textContent).toContain('222');
-    expect(kpi('今日请求').textContent).not.toContain('999');
+    expect(statistic('今日请求').textContent).toContain('222');
+    expect(statistic('今日请求').textContent).not.toContain('999');
     expect(timestamp('运行统计')).toBe(newStamp);
   });
 
-  it('cleans up all pending resource requests and polling on Dashboard/Outlet unmount', async () => {
+  it('cleans up all pending operations, parent-cost and health requests and polling on unmount', async () => {
     const pending = deferred<Stats>();
+    const pendingCosts = deferred<CostSnapshot>();
     const pendingHealth = deferred<Awaited<ReturnType<typeof api.getHealth>>>();
     vi.mocked(api.getStats).mockReturnValue(pending.promise);
+    vi.mocked(api.getCosts).mockReturnValue(pendingCosts.promise);
     vi.mocked(api.getHealth).mockReturnValue(pendingHealth.promise);
-    const { unmount } = renderDashboard();
+    const { unmount } = renderOperations();
     await flush();
     const statsSignal = vi.mocked(api.getStats).mock.calls[0][0]!;
+    const costsSignal = vi.mocked(api.getCosts).mock.calls[0][0]!;
     const healthSignal = vi.mocked(api.getHealth).mock.calls[0][0]!;
     const before = requestCounts();
+    expect([statsSignal, costsSignal, healthSignal].every(signal => !signal.aborted)).toBe(true);
     unmount();
     expect(statsSignal.aborted).toBe(true);
+    expect(costsSignal.aborted).toBe(true);
     expect(healthSignal.aborted).toBe(true);
-    await act(async () => { pending.resolve(stats); pendingHealth.reject(new Error('late failure')); });
+    await act(async () => { pending.resolve(stats); pendingCosts.resolve(costs); pendingHealth.reject(new Error('late failure')); });
     await advance(120_000);
     expect(requestCounts()).toEqual(before);
     expect(vi.getTimerCount()).toBe(0);
   });
 });
 
-describe('Dashboard with the real MainLayout header', { timeout: 15_000 }, () => {
+describe('OperationsDetails with the real MainLayout header', { timeout: 15_000 }, () => {
   it('shares the automatic-refresh switch with health, ages a paused status, and distinguishes failed from fresh health', async () => {
     vi.mocked(api.getHealth).mockResolvedValue({ status: 'ok', accounts: 7 });
-    renderDashboard({ realLayout: true });
+    renderOperations({ realLayout: true });
     await flush();
-    const header = screen.getByRole('banner');
+    const header = screen.getByRole('region', { name: '代理连接状态' });
     expect(within(header).getByText('代理可连接')).toBeTruthy();
     expect(within(header).getByText('已配置 7 个账号')).toBeTruthy();
     expect(api.getHealth).toHaveBeenCalledTimes(1);
@@ -477,15 +541,16 @@ describe('Dashboard with the real MainLayout header', { timeout: 15_000 }, () =>
   it('does not label an unhealthy response or failed initial health read as a usable connection', async () => {
     localStorage.setItem('jc_auto_refresh', 'false');
     vi.mocked(api.getHealth).mockResolvedValue({ status: 'error', accounts: 9 });
-    renderDashboard({ realLayout: true });
+    renderOperations({ realLayout: true });
     await flush();
-    const header = screen.getByRole('banner');
+    const header = screen.getByRole('region', { name: '代理连接状态' });
     expect(within(header).getByText('状态获取失败')).toBeTruthy();
     expect(within(header).getByText('账号数量待读取')).toBeTruthy();
     expect(within(header).queryByText('代理可连接')).toBeNull();
     expect(resource('代理连接').textContent).toContain('尚未读取');
     expect(timestamp('代理连接')).toBeUndefined();
-    expect(kpi('今日请求').textContent).toContain('125');
+    await expandMoreStats();
+    expect(statistic('今日请求').textContent).toContain('125');
     await tab('模型参考');
     expect(modelOrder()).toHaveLength(3);
     vi.mocked(api.getHealth).mockResolvedValue({ status: 'ok', accounts: 2 });

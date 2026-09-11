@@ -1,7 +1,9 @@
+// Modified by Variya, 2026-09-11: light charts and restrained data styling.
 import { useMemo, useState } from 'react';
 import { Card, Col, Row, Segmented, Table, Typography } from 'antd';
 import { Area, AreaChart, CartesianGrid, Legend, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Stats } from '../api';
+import { colors } from '../theme';
 import { fmt } from '../utils/dashboard';
 
 export default function DashboardTrends({ stats, at }: { stats: Stats; at: number }) {
@@ -15,7 +17,7 @@ export default function DashboardTrends({ stats, at }: { stats: Stats; at: numbe
       return { hour: key, label: `${String(d.getHours()).padStart(2, '0')}:00`, requests: h?.count ?? 0, errors: h?.errors ?? 0, tokens: (h?.input_tokens ?? 0) + (h?.output_tokens ?? 0) };
     });
   }, [stats, at]);
-  const tipStyle = { background: '#0E1223', border: '1px solid #334155', borderRadius: 8, color: '#F8FAFC' };
+  const tipStyle = { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text };
   return <section aria-label="24 小时趋势" className="jc-trends">
     <div className="jc-section-toolbar">
       <Typography.Text type="secondary">最近 24 小时 · 请求与 Token</Typography.Text>
@@ -25,31 +27,31 @@ export default function DashboardTrends({ stats, at }: { stats: Stats; at: numbe
       { title: '时间', dataIndex: 'hour' }, { title: '请求数', dataIndex: 'requests', align: 'right' },
       { title: '失败数', dataIndex: 'errors', align: 'right' }, { title: 'Token', dataIndex: 'tokens', align: 'right', render: (n: number) => n.toLocaleString() },
     ]} /> : <Row gutter={[16, 16]}>
-      <Col xs={24} lg={12}><Card size="small" title="24 小时请求趋势">
+      <Col xs={24}><Card size="small" title="24 小时请求趋势">
         <ResponsiveContainer width="100%" height={220}>
           <ComposedChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} accessibilityLayer>
-            <CartesianGrid vertical={false} stroke="#1F2937" />
-            <XAxis dataKey="label" interval={3} tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="#334155" />
-            <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="#334155" allowDecimals={false} width={44} />
-            <Tooltip contentStyle={tipStyle} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#F8FAFC' }}
+            <CartesianGrid vertical={false} stroke={colors.grid} />
+            <XAxis dataKey="label" interval={3} tick={{ fontSize: 12, fill: colors.muted }} stroke={colors.grid} />
+            <YAxis tick={{ fontSize: 12, fill: colors.muted }} stroke={colors.grid} allowDecimals={false} width={44} />
+            <Tooltip contentStyle={tipStyle} labelStyle={{ color: colors.muted }} itemStyle={{ color: colors.text }}
               labelFormatter={(_, payload) => payload?.[0]?.payload.hour ?? ''}
               formatter={(v, name) => [Number(v).toLocaleString(), name]} />
-            <Legend formatter={name => <span style={{ color: '#94A3B8' }}>{name}</span>} />
-            <Area type="linear" dataKey="requests" name="请求数" stroke="#3987E5" fill="#3987E5" fillOpacity={0.12} strokeWidth={2} isAnimationActive={false} />
-            <Line type="linear" dataKey="errors" name="失败数" stroke="#EF4444" strokeDasharray="4 3" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+            <Legend formatter={name => <span style={{ color: colors.muted }}>{name}</span>} />
+            <Area type="linear" dataKey="requests" name="请求数" stroke={colors.accent} fill={colors.accent} fillOpacity={0.12} strokeWidth={2} isAnimationActive={false} />
+            <Line type="linear" dataKey="errors" name="失败数" stroke={colors.danger} strokeDasharray="4 3" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </Card></Col>
-      <Col xs={24} lg={12}><Card size="small" title="24 小时 Token 消耗趋势">
+      <Col xs={24}><Card size="small" title="24 小时 Token 消耗趋势">
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} accessibilityLayer>
-            <CartesianGrid vertical={false} stroke="#1F2937" />
-            <XAxis dataKey="label" interval={3} tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="#334155" />
-            <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="#334155" tickFormatter={fmt} width={52} />
-            <Tooltip contentStyle={tipStyle} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#F8FAFC' }}
+            <CartesianGrid vertical={false} stroke={colors.grid} />
+            <XAxis dataKey="label" interval={3} tick={{ fontSize: 12, fill: colors.muted }} stroke={colors.grid} />
+            <YAxis tick={{ fontSize: 12, fill: colors.muted }} stroke={colors.grid} tickFormatter={fmt} width={52} />
+            <Tooltip contentStyle={tipStyle} labelStyle={{ color: colors.muted }} itemStyle={{ color: colors.text }}
               labelFormatter={(_, payload) => payload?.[0]?.payload.hour ?? ''}
               formatter={v => [Number(v).toLocaleString(), 'Token']} />
-            <Area type="linear" dataKey="tokens" name="Token" stroke="#3987E5" fill="#3987E5" fillOpacity={0.12} strokeWidth={2} isAnimationActive={false} />
+            <Area type="linear" dataKey="tokens" name="Token" stroke={colors.accent} fill={colors.accent} fillOpacity={0.12} strokeWidth={2} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </Card></Col>

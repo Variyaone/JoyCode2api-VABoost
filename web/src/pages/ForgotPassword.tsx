@@ -1,19 +1,22 @@
+// Modified by Variya 2026-09-11: restrained light UI and readable commands.
 import React, { useEffect, useState } from 'react';
 import { Button, Typography, Alert } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { authApi } from '../api';
+import BrandMark from '../components/BrandMark';
+import ProjectCredits from '../components/ProjectCredits';
 
 const { Title, Text, Paragraph } = Typography;
 
 type TokenType = 'prompt' | 'path' | 'subcommand' | 'flag' | 'value';
 
 const TOKEN_COLORS: Record<TokenType, string> = {
-  prompt: '#a6e3a1',
-  path: '#89b4fa',
-  subcommand: '#94e2d5',
-  flag: '#f9e2af',
-  value: '#fab387',
+  prompt: '#646B78',
+  path: '#252A34',
+  subcommand: '#5966A6',
+  flag: '#5966A6',
+  value: '#252A34',
 };
 
 interface Token {
@@ -47,14 +50,15 @@ function tokenizeCommand(cmd: string): Token[] {
 }
 
 const codeBlockStyle: React.CSSProperties = {
-  background: '#1e1e2e',
-  color: '#cdd6f4',
+  background: '#F5F6F8',
+  color: '#252A34',
+  border: '1px solid #E1E4EA',
   padding: '14px 18px',
   borderRadius: 8,
   marginTop: 8,
   marginBottom: 20,
   fontSize: 14,
-  fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+  fontFamily: 'var(--jc-font-code)',
   lineHeight: 1.6,
   overflow: 'auto',
   whiteSpace: 'pre-wrap' as const,
@@ -90,6 +94,7 @@ const ForgotPasswordPage: React.FC = () => {
   return (
     <div className="jc-auth-bg">
       <div className="jc-auth-card" style={{ width: 660 }}>
+        <div className="jc-auth-logo"><BrandMark size={40} /></div>
         <Title level={3} style={{ marginBottom: 8 }}>忘记密码</Title>
         <Paragraph type="secondary" style={{ marginBottom: 24 }}>
           Dashboard 的 root 密码需要通过服务器命令行重置。
@@ -125,6 +130,7 @@ const ForgotPasswordPage: React.FC = () => {
             返回登录
           </Button>
         </Link>
+        <ProjectCredits />
       </div>
     </div>
   );

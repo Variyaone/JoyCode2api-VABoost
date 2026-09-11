@@ -5,6 +5,7 @@ describe('dashboard number formatting', () => {
   it.each([
     [0, '0'], [12, '12'], [999, '999'], [1000, '1.0K'], [1250, '1.3K'],
     [999_000, '999.0K'], [1_000_000, '1.00M'], [1_234_567, '1.23M'],
+    [1_000_000_000, '1.00B'], [2_244_680_000, '2.24B'],
   ])('formats %s as %s', (value, expected) => {
     expect(fmt(value)).toBe(expected);
   });

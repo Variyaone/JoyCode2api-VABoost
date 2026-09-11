@@ -75,14 +75,26 @@ func (h *Handler) handleMessages(w http.ResponseWriter, r *http.Request) {
 		req.MaxTokens = 32768
 	}
 
-		accountDefault := store.GetAccountDefaultModel(r)
-		systemDefault := ""
-		if h.store != nil {
-			systemDefault = h.store.GetSetting("default_model")
-		}
-		resolved := resolveModel(req.Model, accountDefault, systemDefault)
-		store.SetModel(r, resolved)
-		reqLog(r).Info("anthropic request", "model", req.Model, "resolved", resolved, "stream", req.Stream, "max_tokens", req.MaxTokens, "messages", len(req.Messages), "tools", len(req.Tools))
+	accountDefault := store.GetAccountDefaultModel(r)
+	systemDefault := ""
+	if h.store != nil {
+		systemDefault = h.store.GetSetting("default_model")
+	}
+	resolved := resolveModel(req.Model, accountDefault, systemDefault)
+	store.SetModel(r, resolved)
+	if resolved == "JoyCode-Base-V3" {
+		writeAnthropicError(w, http.StatusBadRequest, "JoyCode-Base-V3 是代码补全模型，不支持聊天/工具会话。请选择目录中的聊天模型；不会自动替换为其他模型。")
+		return
+	}
+	// Keep the existing max_tokens cap, but never let it make an enabled
+	// native thinking budget invalid. Reject before any upstream call or SSE
+	// headers; silently lowering the caller's budget would change its intent.
+	if ClaudeNativeEnabled(h.store) && (IsNativeAnthropicModel(req.Model) || IsNativeAnthropicModel(resolved)) &&
+		req.Thinking != nil && req.Thinking.Type == "enabled" && req.Thinking.BudgetTokens >= req.MaxTokens {
+		writeAnthropicRequestError(w, fmt.Sprintf("thinking.budget_tokens (%d) 必须小于有效 max_tokens (%d，兼容上限 32768)。请显式降低 budget_tokens；请求未发送到上游。", req.Thinking.BudgetTokens, req.MaxTokens))
+		return
+	}
+	reqLog(r).Info("anthropic request", "model", req.Model, "resolved", resolved, "stream", req.Stream, "max_tokens", req.MaxTokens, "messages", len(req.Messages), "tools", len(req.Tools))
 
 	client := h.getClient(r)
 
@@ -131,93 +143,26 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 		}
 		defer resp.Body.Close()
 
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		var text strings.Builder
-		var inTk, outTk int
-		toolCalls := []ContentBlock{}
-		toolNames := map[string]string{}
-		toolOrder := []string{}
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			for strings.HasPrefix(line, "data:") {
-				line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			}
-			if line == "" || !strings.HasPrefix(line, "{") {
-				continue
-			}
-			var ev struct {
-				Type   string `json:"type"`
-				Delta  string `json:"delta"`
-				Item   *struct {
-					ID        string `json:"id"`
-					Type      string `json:"type"`
-					CallID    string `json:"call_id"`
-					Name      string `json:"name"`
-					Arguments string `json:"arguments"`
-				} `json:"item"`
-				Response *struct {
-					Usage *struct {
-						InputTokens  int `json:"input_tokens"`
-						OutputTokens int `json:"output_tokens"`
-					} `json:"usage"`
-				} `json:"response"`
-			}
-			if err := json.Unmarshal([]byte(line), &ev); err != nil {
-				continue
-			}
-			switch ev.Type {
-			case "response.output_text.delta":
-				text.WriteString(ev.Delta)
-			case "response.output_item.done":
-				if ev.Item != nil && ev.Item.Type == "function_call" {
-					key := ev.Item.CallID
-					if key == "" {
-						key = ev.Item.ID
-					}
-					if _, ok := toolNames[key]; !ok {
-						toolOrder = append(toolOrder, key)
-					}
-					if ev.Item.Name != "" {
-						toolNames[key] = ev.Item.Name
-					}
-					args := ev.Item.Arguments
-					if args == "" || !json.Valid([]byte(args)) {
-						args = "{}"
-					}
-					toolCalls = append(toolCalls, ContentBlock{
-						Type: "tool_use", ID: key, Name: toolNames[key], Input: json.RawMessage(args),
-					})
-				}
-			case "response.completed":
-				if ev.Response != nil && ev.Response.Usage != nil {
-					inTk = ev.Response.Usage.InputTokens
-					outTk = ev.Response.Usage.OutputTokens
-				}
-			case "error", "response.failed":
-				writeAnthropicError(w, 500, truncate(line, 500))
-				return
-			}
+		result, err := readResponses(resp.Body, nil)
+		if err != nil {
+			writeAnthropicError(w, 500, err.Error())
+			return
 		}
 		content := []ContentBlock{}
-		if text.Len() > 0 {
-			content = append(content, ContentBlock{Type: "text", Text: text.String()})
+		if result.Text != "" {
+			content = append(content, ContentBlock{Type: "text", Text: result.Text})
 		}
-		content = append(content, toolCalls...)
+		for _, tool := range result.Tools {
+			content = append(content, tool.block())
+		}
 		if len(content) == 0 {
 			content = []ContentBlock{{Type: "text", Text: ""}}
 		}
-		stopReason := "end_turn"
-		if len(toolCalls) > 0 {
-			stopReason = "tool_use"
-		}
-		if inTk > 0 || outTk > 0 {
-			store.SetTokenUsage(r, inTk, outTk)
-		}
+		store.SetTokenUsage(r, result.Usage.InputTokens, result.Usage.OutputTokens)
 		writeAnthropicJSON(w, 200, &MessageResponse{
 			ID: NewMessageID(), Type: "message", Role: "assistant",
-			Content: content, Model: req.Model, StopReason: &stopReason,
-			Usage: Usage{InputTokens: inTk, OutputTokens: outTk},
+			Content: content, Model: req.Model, StopReason: &result.StopReason,
+			Usage: result.Usage,
 		})
 		return
 	}
@@ -264,13 +209,12 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 		}
 		if strings.Contains(errMsg, "content_filter") || strings.Contains(errMsg, "SENSITIVE_CONTENT") {
 			reqLog(r).Warn("upstream content_filter (non-stream), returning detailed error")
-				writeContentFilterError(w, errMsg)
+			writeContentFilterError(w, errMsg)
 			return
 		}
 		writeAnthropicError(w, 500, errMsg)
 		return
 	}
-	resp := TranslateResponse(jcResp, req.Model)
 	// Check for content_filter in non-stream response
 	if choices, ok := jcResp["choices"].([]interface{}); ok && len(choices) > 0 {
 		if choice, ok := choices[0].(map[string]interface{}); ok {
@@ -281,6 +225,11 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 				return
 			}
 		}
+	}
+	resp, validationErr := validatedChatResponse(jcResp, req.Model)
+	if validationErr != nil {
+		writeAnthropicError(w, 500, validationErr.Error())
+		return
 	}
 	if usage, ok := jcResp["usage"].(map[string]interface{}); ok {
 		inTk, _ := usage["prompt_tokens"].(float64)
@@ -423,206 +372,152 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *Mess
 	}
 	defer resp.Body.Close()
 
-	type toolCallAccum struct {
-		ID        string
-		Name      string
-		Arguments string
-	}
-	toolCalls := make(map[int]*toolCallAccum)
+	toolCalls := make(map[int]*completedTool)
 	currentBlockIndex := 0
 	textBlockStarted := false
-	toolBlockStarted := map[int]bool{}
-	toolBlockToIdx := map[int]int{}
+	closeText := func() {
+		if textBlockStarted {
+			FormatSSE(w, "content_block_stop", sseContentBlockStop{Type: "content_block_stop", Index: currentBlockIndex})
+			currentBlockIndex++
+			textBlockStarted = false
+		}
+	}
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	chunkCount := 0
 	var streamInTk, streamOutTk int
-	finishReasonSeen := false
+	finishReason := ""
+	var streamErr error
 
 	for scanner.Scan() {
-		line := scanner.Text()
-		chunkCount++
-		chunk := ParseStreamChunk(line)
-		if chunk == nil || len(chunk.Choices) == 0 {
-			if chunk != nil && chunk.Usage != nil {
-				streamInTk = chunk.Usage.PromptTokens
-				streamOutTk = chunk.Usage.CompletionTokens
-			}
+		line := unwrapNativeAnthropicSSE(scanner.Text())
+		if line == "[DONE]" {
+			break
+		}
+		if line == "" || strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") || strings.HasPrefix(line, "id:") || strings.HasPrefix(line, "retry:") {
 			continue
 		}
-		choice := chunk.Choices[0]
+		if isUpstreamError(line) {
+			streamErr = fmt.Errorf("upstream Chat stream error: %s", line)
+			break
+		}
+		chunk := ParseStreamChunk(line)
+		if chunk == nil {
+			streamErr = fmt.Errorf("invalid upstream Chat stream event: %s", line)
+			break
+		}
 		if chunk.Usage != nil {
 			streamInTk = chunk.Usage.PromptTokens
 			streamOutTk = chunk.Usage.CompletionTokens
 		}
-
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		choice := chunk.Choices[0]
+		// A finish_reason is terminal for the choice. Only usage/[DONE]
+		// may follow it; don't emit tools until those trailers are consumed.
+		if finishReason != "" {
+			if choice.Delta.Content != "" || len(choice.Delta.ToolCalls) > 0 || (choice.FinishReason != nil && *choice.FinishReason != finishReason) {
+				streamErr = fmt.Errorf("upstream Chat emitted content or conflicting finish_reason after completion")
+				break
+			}
+			continue
+		}
 		for _, tc := range choice.Delta.ToolCalls {
-			idx := tc.Index
-			if _, exists := toolCalls[idx]; !exists {
-				toolCalls[idx] = &toolCallAccum{
-					ID:   tc.ID,
-					Name: tc.Function.Name,
-				}
+			if tc.Index < 0 {
+				streamErr = fmt.Errorf("invalid upstream tool index %d", tc.Index)
+				break
+			}
+			tool := toolCalls[tc.Index]
+			if tool == nil {
+				tool = &completedTool{}
+				toolCalls[tc.Index] = tool
 			}
 			if tc.ID != "" {
-				toolCalls[idx].ID = tc.ID
+				if tool.ID != "" && tool.ID != tc.ID {
+					streamErr = fmt.Errorf("conflicting upstream tool ID at index %d", tc.Index)
+					break
+				}
+				tool.ID = tc.ID
 			}
 			if tc.Function.Name != "" {
-				toolCalls[idx].Name = tc.Function.Name
-			}
-			toolCalls[idx].Arguments += tc.Function.Arguments
-
-			if !toolBlockStarted[idx] {
-				if textBlockStarted {
-					FormatSSE(w, "content_block_stop", sseContentBlockStop{
-						Type: "content_block_stop", Index: currentBlockIndex,
-					})
-					currentBlockIndex++
-					textBlockStarted = false
+				if tool.Name != "" && tool.Name != tc.Function.Name {
+					streamErr = fmt.Errorf("conflicting upstream tool name at index %d", tc.Index)
+					break
 				}
-				toolBlockStarted[idx] = true
-				toolBlockToIdx[idx] = currentBlockIndex
-				tcID := toolCalls[idx].ID
-				if tcID == "" {
-					tcID = "toolu_" + newID()
-				}
-				FormatSSE(w, "content_block_start", sseContentBlockStart{
-					Type:  "content_block_start",
-					Index: currentBlockIndex,
-					ContentBlock: ContentBlock{
-						Type:  "tool_use",
-						ID:    tcID,
-						Name:  toolCalls[idx].Name,
-						Input: json.RawMessage("{}"),
-					},
-				})
-				flusher.Flush()
-				currentBlockIndex++
+				tool.Name = tc.Function.Name
 			}
+			tool.Arguments += tc.Function.Arguments
 		}
-
-		text := choice.Delta.Content
-		if text != "" {
+		if streamErr != nil {
+			break
+		}
+		if text := choice.Delta.Content; text != "" {
 			if !textBlockStarted {
 				textBlockStarted = true
 				FormatSSE(w, "content_block_start", sseContentBlockStart{
-					Type:         "content_block_start",
-					Index:        currentBlockIndex,
+					Type: "content_block_start", Index: currentBlockIndex,
 					ContentBlock: ContentBlock{Type: "text", Text: ""},
 				})
-				flusher.Flush()
 			}
 			totalOutput += len(text)
 			FormatSSE(w, "content_block_delta", sseContentBlockDelta{
-				Type:  "content_block_delta",
-				Index: currentBlockIndex,
+				Type: "content_block_delta", Index: currentBlockIndex,
 				Delta: deltaText{Type: "text_delta", Text: text},
 			})
 			flusher.Flush()
 		}
-
 		if choice.FinishReason != nil {
-			fr := *choice.FinishReason
-			finishReasonSeen = true
-			reqLog(r).Info("stream completed", "chunks", chunkCount, "reason", fr, "tools", len(toolCalls))
-
-			// Ensure at least one content block exists — Anthropic SDK requires it
-			if !textBlockStarted && len(toolBlockStarted) == 0 {
-				textBlockStarted = true
-				FormatSSE(w, "content_block_start", sseContentBlockStart{
-					Type:         "content_block_start",
-					Index:        currentBlockIndex,
-					ContentBlock: ContentBlock{Type: "text", Text: ""},
-				})
-				flusher.Flush()
-			}
-
-			if textBlockStarted {
-				FormatSSE(w, "content_block_stop", sseContentBlockStop{
-					Type: "content_block_stop", Index: currentBlockIndex,
-				})
-				currentBlockIndex++
-				textBlockStarted = false
-			}
-			for i := 0; i < len(toolCalls); i++ {
-				if toolBlockStarted[i] {
-					args := toolCalls[i].Arguments
-					if args == "" || !json.Valid([]byte(args)) {
-						args = "{}"
-					}
-					FormatSSE(w, "content_block_delta", sseContentBlockDelta{
-						Type:  "content_block_delta",
-						Index: toolBlockToIdx[i],
-						Delta: deltaText{Type: "input_json_delta", PartialJSON: args},
-					})
-					FormatSSE(w, "content_block_stop", sseContentBlockStop{
-						Type: "content_block_stop", Index: toolBlockToIdx[i],
-					})
-				}
-			}
-
-			if fr == "content_filter" {
-				// Don't disguise a filter-truncated turn as a clean end_turn
-				// (issue #2). Blocks are already closed above; surface an error.
-				reqLog(r).Warn("upstream content_filter mid-stream, surfacing as error")
-				writeStreamError(w, flusher, "上游内容安全策略拦截了本次回复，输出可能不完整。结束原因: content_filter")
-			} else {
-				stopReason := "end_turn"
-				switch fr {
-				case "tool_calls":
-					stopReason = "tool_use"
-				case "length":
-					stopReason = "max_tokens"
-				case "stop":
-					stopReason = "end_turn"
-				}
-				FormatSSE(w, "message_delta", sseMessageDelta{
-					Type:  "message_delta",
-					Delta: deltaStop{StopReason: stopReason},
-					Usage: struct {
-						OutputTokens int `json:"output_tokens"`
-					}{OutputTokens: totalOutput / 4},
-				})
-				FormatSSE(w, "message_stop", sseMessageStop{Type: "message_stop"})
-				flusher.Flush()
+			finishReason = *choice.FinishReason
+			if finishReason == "content_filter" {
+				streamErr = fmt.Errorf("upstream Chat content_filter: %s", line)
+				break
 			}
 		}
 	}
-
-	// If the loop ended without ever seeing an upstream finish_reason, the stream
-	// was truncated — a read error (scanner.Err) or a clean EOF mid-generation.
-	// Don't fake a clean completion (issue #2): close any open content blocks for
-	// well-formed SSE, then surface an error event so the client shows a failure
-	// (and can retry) instead of a silent truncated "success". If finishReasonSeen
-	// is true the loop already emitted message_stop, so a trailing read error after
-	// a complete answer is ignored.
-	if !finishReasonSeen {
-		if textBlockStarted {
-			FormatSSE(w, "content_block_stop", sseContentBlockStop{
-				Type: "content_block_stop", Index: currentBlockIndex,
-			})
-			currentBlockIndex++
-			textBlockStarted = false
-		}
-		for i := 0; i < len(toolCalls); i++ {
-			if toolBlockStarted[i] {
-				FormatSSE(w, "content_block_stop", sseContentBlockStop{
-					Type: "content_block_stop", Index: toolBlockToIdx[i],
-				})
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			reqLog(r).Error("stream ended abnormally before finish_reason", "error", err, "chunks", chunkCount)
-			writeStreamError(w, flusher, "读取上游流式响应失败，本次回复不完整，请重试。原始错误: "+err.Error())
-		} else {
-			reqLog(r).Warn("stream closed before finish_reason (premature upstream close)", "chunks", chunkCount)
-			writeStreamError(w, flusher, "上游在返回结束标记前断开了流式响应，本次回复可能不完整，请重试。")
-		}
-	}
+	closeText()
 	if streamInTk > 0 || streamOutTk > 0 {
 		store.SetTokenUsage(r, streamInTk, streamOutTk)
 	}
+	if streamErr == nil && scanner.Err() != nil {
+		streamErr = fmt.Errorf("reading upstream Chat stream: %w", scanner.Err())
+	}
+	if streamErr == nil && finishReason == "" {
+		streamErr = fmt.Errorf("upstream Chat stream closed (EOF/[DONE]) before finish_reason")
+	}
+	stopReason := ""
+	if streamErr == nil {
+		stopReason, streamErr = chatStopReason(finishReason, len(toolCalls))
+	}
+	var tools []completedTool
+	if streamErr == nil && stopReason != "max_tokens" {
+		tools, streamErr = sortedChatTools(toolCalls)
+	}
+	if streamErr != nil {
+		writeStreamError(w, flusher, streamErr.Error())
+		return
+	}
+	for _, tool := range tools {
+		emitCompletedTool(w, currentBlockIndex, tool)
+		currentBlockIndex++
+	}
+	if currentBlockIndex == 0 {
+		FormatSSE(w, "content_block_start", sseContentBlockStart{Type: "content_block_start", Index: 0, ContentBlock: ContentBlock{Type: "text", Text: ""}})
+		FormatSSE(w, "content_block_stop", sseContentBlockStop{Type: "content_block_stop", Index: 0})
+	}
+	outputTokens := streamOutTk
+	if outputTokens == 0 {
+		outputTokens = totalOutput / 4
+	}
+	FormatSSE(w, "message_delta", sseMessageDelta{
+		Type: "message_delta", Delta: deltaStop{StopReason: stopReason},
+		Usage: struct {
+			OutputTokens int `json:"output_tokens"`
+		}{OutputTokens: outputTokens},
+	})
+	FormatSSE(w, "message_stop", sseMessageStop{Type: "message_stop"})
+	flusher.Flush()
+
 }
 
 func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, req *MessageRequest, client *joycode.Client, flusher http.Flusher, systemDefault string) {
@@ -679,205 +574,53 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 	}
 	defer resp.Body.Close()
 
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
 	currentBlockIndex := 0
 	textBlockStarted := false
-	toolBlockStarted := map[string]bool{}
-	toolOrder := []string{}
-	toolIDs := map[string]string{}
-	toolNames := map[string]string{}
-	toolArgs := map[string]string{}
-	var inTk, outTk int
-	sawError := false
-
-	flushToolCalls := func() {
-		for _, key := range toolOrder {
-			if !toolBlockStarted[key] {
-				toolBlockStarted[key] = true
-				id := toolIDs[key]
-				if id == "" {
-					id = "toolu_" + newID()
-				}
-				args := toolArgs[key]
-				if args == "" || !json.Valid([]byte(args)) {
-					args = "{}"
-				}
-				FormatSSE(w, "content_block_start", sseContentBlockStart{
-					Type: "content_block_start", Index: currentBlockIndex,
-					ContentBlock: ContentBlock{Type: "tool_use", ID: id, Name: toolNames[key]},
-				})
-				// Anthropic clients expect arguments to arrive via
-				// input_json_delta, not on the start block.
-				FormatSSE(w, "content_block_delta", sseContentBlockDelta{
-					Type: "content_block_delta", Index: currentBlockIndex,
-					Delta: deltaText{Type: "input_json_delta", PartialJSON: args},
-				})
-				FormatSSE(w, "content_block_stop", sseContentBlockStop{Type: "content_block_stop", Index: currentBlockIndex})
-				currentBlockIndex++
-				flusher.Flush()
-			}
-		}
-	}
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		// Upstream double-wraps SSE lines ("data: event: x" / "data: data: {...}").
-		for strings.HasPrefix(line, "data:") {
-			line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		}
-		if line == "" || !strings.HasPrefix(line, "{") {
-			continue
-		}
-		var ev struct {
-			Type   string `json:"type"`
-			Delta  string `json:"delta"`
-			Item   *struct {
-				ID        string `json:"id"`
-				Type      string `json:"type"`
-				CallID    string `json:"call_id"`
-				Name      string `json:"name"`
-				Arguments string `json:"arguments"`
-			} `json:"item"`
-			Response *struct {
-				Usage *struct {
-					InputTokens  int `json:"input_tokens"`
-					OutputTokens int `json:"output_tokens"`
-				} `json:"usage"`
-			} `json:"response"`
-			Usage *struct {
-				InputTokens  int `json:"input_tokens"`
-				OutputTokens int `json:"output_tokens"`
-			} `json:"usage"`
-		}
-		if err := json.Unmarshal([]byte(line), &ev); err != nil {
-			continue
-		}
-		switch ev.Type {
-		case "response.output_text.delta":
-			if ev.Delta == "" {
-				continue
-			}
-			if !textBlockStarted {
-				textBlockStarted = true
-				FormatSSE(w, "content_block_start", sseContentBlockStart{
-					Type: "content_block_start", Index: currentBlockIndex,
-					ContentBlock: ContentBlock{Type: "text", Text: ""},
-				})
-				flusher.Flush()
-			}
-			FormatSSE(w, "content_block_delta", sseContentBlockDelta{
-				Type: "content_block_delta", Index: currentBlockIndex,
-				Delta: deltaText{Type: "text_delta", Text: ev.Delta},
+	result, readErr := readResponses(resp.Body, func(text string) {
+		if !textBlockStarted {
+			textBlockStarted = true
+			FormatSSE(w, "content_block_start", sseContentBlockStart{
+				Type: "content_block_start", Index: currentBlockIndex,
+				ContentBlock: ContentBlock{Type: "text", Text: ""},
 			})
-			flusher.Flush()
-		case "response.output_item.added":
-			if ev.Item != nil && ev.Item.Type == "function_call" {
-				key := ev.Item.CallID
-				if key == "" {
-					key = ev.Item.ID
-				}
-				if _, ok := toolIDs[key]; !ok {
-					toolOrder = append(toolOrder, key)
-					toolIDs[key] = "toolu_" + newID()
-				}
-				if ev.Item.Name != "" {
-					toolNames[key] = ev.Item.Name
-				}
-				// close any open text block before first tool
-				if textBlockStarted && !anyToolStarted(toolBlockStarted) {
-					FormatSSE(w, "content_block_stop", sseContentBlockStop{Type: "content_block_stop", Index: currentBlockIndex})
-					currentBlockIndex++
-					textBlockStarted = false
-				}
-			}
-		case "response.output_item.done":
-			if ev.Item != nil && ev.Item.Type == "function_call" {
-				key := ev.Item.CallID
-				if key == "" {
-					key = ev.Item.ID
-				}
-				if _, ok := toolIDs[key]; !ok {
-					toolOrder = append(toolOrder, key)
-					toolIDs[key] = "toolu_" + newID()
-				}
-				if ev.Item.Name != "" {
-					toolNames[key] = ev.Item.Name
-				}
-				toolArgs[key] = ev.Item.Arguments
-				flushToolCalls()
-			}
-		case "response.completed":
-			if ev.Response != nil && ev.Response.Usage != nil {
-				inTk = ev.Response.Usage.InputTokens
-				outTk = ev.Response.Usage.OutputTokens
-			}
-			if ev.Usage != nil {
-				if ev.Usage.InputTokens > 0 {
-					inTk = ev.Usage.InputTokens
-				}
-				if ev.Usage.OutputTokens > 0 {
-					outTk = ev.Usage.OutputTokens
-				}
-			}
-		case "error", "response.failed":
-			sawError = true
-			reqLog(r).Error("responses stream upstream error event", "payload", truncate(line, 300))
-			writeStreamError(w, flusher, "上游 GPT 响应错误: "+truncate(line, 400))
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		reqLog(r).Error("responses stream read error", "error", err)
-	}
-
-	if sawError {
-		if inTk > 0 || outTk > 0 {
-			store.SetTokenUsage(r, inTk, outTk)
-		}
-		return
-	}
-	// Close out the message like the chat path does.
+		FormatSSE(w, "content_block_delta", sseContentBlockDelta{
+			Type: "content_block_delta", Index: currentBlockIndex,
+			Delta: deltaText{Type: "text_delta", Text: text},
+		})
+		flusher.Flush()
+	})
 	if textBlockStarted {
 		FormatSSE(w, "content_block_stop", sseContentBlockStop{Type: "content_block_stop", Index: currentBlockIndex})
 		currentBlockIndex++
-		textBlockStarted = false
 	}
-	flushToolCalls()
-	if !textBlockStarted && len(toolOrder) == 0 {
-		// Ensure at least one content block exists
+	if result.Usage.InputTokens > 0 || result.Usage.OutputTokens > 0 {
+		store.SetTokenUsage(r, result.Usage.InputTokens, result.Usage.OutputTokens)
+	}
+	if readErr != nil {
+		writeStreamError(w, flusher, readErr.Error())
+		return
+	}
+	for _, tool := range result.Tools {
+		emitCompletedTool(w, currentBlockIndex, tool)
+		currentBlockIndex++
+	}
+	if currentBlockIndex == 0 && len(result.Tools) == 0 {
+		// Preserve the guard: never append an empty block after real text.
 		FormatSSE(w, "content_block_start", sseContentBlockStart{
 			Type: "content_block_start", Index: currentBlockIndex,
 			ContentBlock: ContentBlock{Type: "text", Text: ""},
 		})
 		FormatSSE(w, "content_block_stop", sseContentBlockStop{Type: "content_block_stop", Index: currentBlockIndex})
-		currentBlockIndex++
-	}
-	stopReason := "end_turn"
-	if len(toolOrder) > 0 {
-		stopReason = "tool_use"
 	}
 	FormatSSE(w, "message_delta", sseMessageDelta{
-		Type:  "message_delta",
-		Delta: deltaStop{StopReason: stopReason},
+		Type: "message_delta", Delta: deltaStop{StopReason: result.StopReason},
 		Usage: struct {
 			OutputTokens int `json:"output_tokens"`
-		}{OutputTokens: outTk},
+		}{OutputTokens: result.Usage.OutputTokens},
 	})
 	FormatSSE(w, "message_stop", sseMessageStop{Type: "message_stop"})
 	flusher.Flush()
-	if inTk > 0 || outTk > 0 {
-		store.SetTokenUsage(r, inTk, outTk)
-	}
-}
-
-func anyToolStarted(started map[string]bool) bool {
-	for _, v := range started {
-		if v {
-			return true
-		}
-	}
-	return false
 }
 
 func (h *Handler) handleNativeAnthropicStream(w http.ResponseWriter, r *http.Request, req *MessageRequest, client *joycode.Client, flusher http.Flusher, systemDefault string) {
@@ -1238,10 +981,10 @@ func (h *Handler) connectStreamWithRetry(r *http.Request, jcBody map[string]inte
 		}
 
 		br := bufio.NewReaderSize(resp.Body, 64*1024)
-		firstLine, err := br.ReadString('\n')
-		if err != nil {
+		firstLine, readErr := br.ReadString('\n')
+		if readErr != nil && firstLine == "" {
 			resp.Body.Close()
-			lastErr = fmt.Errorf("read first line: %w", err)
+			lastErr = fmt.Errorf("read first line: %w", readErr)
 			reqLog(r).Error("stream read first line", "attempt", attempt, "max", maxRetries, "error", lastErr)
 			if attempt < maxRetries {
 				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
@@ -1249,11 +992,10 @@ func (h *Handler) connectStreamWithRetry(r *http.Request, jcBody map[string]inte
 			continue
 		}
 
-		trimmed := strings.TrimSpace(firstLine)
-		dataContent := strings.TrimPrefix(trimmed, "data: ")
+		dataContent := unwrapNativeAnthropicSSE(firstLine)
 		if isUpstreamError(dataContent) {
 			resp.Body.Close()
-			lastErr = fmt.Errorf("upstream error: %s", truncate(dataContent, 500))
+			lastErr = fmt.Errorf("upstream error: %s", dataContent)
 			logUpstreamError(r, attempt, maxRetries, dataContent)
 			if isContextLimitError(dataContent) {
 				return nil, lastErr
@@ -1271,31 +1013,22 @@ func (h *Handler) connectStreamWithRetry(r *http.Request, jcBody map[string]inte
 		// Check first line for content_filter (content + finish_reason in same chunk)
 		if filtered, chunkData := extractContentFilterInfo(dataContent); filtered {
 			resp.Body.Close()
-			lastErr = fmt.Errorf("%s", truncate(chunkData, 500))
+			lastErr = fmt.Errorf("%s", chunkData)
 			reqLog(r).Warn("content_filter detected in first chunk, not retrying", "chunk", truncate(chunkData, 300))
 			return nil, lastErr
 		}
 
-		// Peek second line to detect content_filter with separate finish_reason
-		replayLines := firstLine
-		secondLine, sErr := br.ReadString('\n')
-		if sErr == nil {
-			replayLines += secondLine
-			trimmedSecond := strings.TrimSpace(secondLine)
-			dataSecond := strings.TrimPrefix(trimmedSecond, "data: ")
-			if filtered, chunkData := extractContentFilterInfo(dataSecond); filtered {
-				resp.Body.Close()
-				lastErr = fmt.Errorf("%s", truncate(chunkData, 500))
-				reqLog(r).Warn("content_filter detected in second chunk, not retrying", "chunk", truncate(chunkData, 300))
-				return nil, lastErr
-			}
-		}
-
-		// Wrap body to replay buffered lines for the scanner
+		// Leave subsequent lines to the stream parser. Peeking another line
+		// used to discard its bytes and read error when it lacked a newline.
 		originalBody := resp.Body
+		var source io.Reader = br
+		if readErr != nil {
+			// ReadString already consumed the error; replay it after its bytes.
+			source = completionReadError{err: readErr}
+		}
 		resp.Body = &prependReader{
-			first:  []byte(replayLines),
-			source: br,
+			first:  []byte(firstLine),
+			source: source,
 			body:   originalBody,
 		}
 		reqLog(r).Info("stream connected", "attempt", attempt)

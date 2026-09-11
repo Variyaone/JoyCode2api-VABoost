@@ -1,9 +1,12 @@
+// Modified by Variya 2026-09-11: restrained light UI and shared branding.
 import React, { useState } from 'react';
 import { Form, Input, Button, message, Typography, Progress } from 'antd';
-import { LockOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import UsageNotice from '../components/UsageNotice';
+import BrandMark from '../components/BrandMark';
+import ProjectCredits from '../components/ProjectCredits';
 import { authApi, setToken } from '../api';
+import { colors } from '../theme';
 
 const { Title, Text } = Typography;
 
@@ -39,7 +42,7 @@ const SetupPage: React.FC = () => {
     <div className="jc-auth-bg">
       <div className="jc-auth-card" style={{ width: 460 }}>
         <div className="jc-auth-logo">
-          <CheckCircleOutlined style={{ fontSize: 26, color: '#052e16' }} />
+          <BrandMark size={40} />
         </div>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <Title level={3} style={{ marginBottom: 4 }}>初始化 JoyCode 代理</Title>
@@ -50,7 +53,7 @@ const SetupPage: React.FC = () => {
             {({ getFieldValue }) => {
               const pw = getFieldValue('password') || '';
               const strength = getPasswordStrength(pw);
-              const color = strength <= 25 ? '#EF4444' : strength <= 50 ? '#F59E0B' : strength <= 75 ? '#22C55E' : '#16A34A';
+              const color = strength <= 25 ? colors.danger : strength <= 50 ? colors.warning : colors.success;
               const label = strength <= 25 ? '弱' : strength <= 50 ? '中' : strength <= 75 ? '强' : '很强';
               return pw ? (
                 <div style={{ marginTop: -8, marginBottom: 16 }}>
@@ -97,7 +100,7 @@ const SetupPage: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
-        <UsageNotice />
+        <ProjectCredits />
       </div>
     </div>
   );

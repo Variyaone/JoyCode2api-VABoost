@@ -1,3 +1,5 @@
+// Modified by Variya, 2026-09-11: shared model identity and light presentation.
+import ModelLogo from './ModelLogo';
 import { useMemo, useState } from 'react';
 import { Alert, Card, Empty, Input, Segmented, Space, Spin, Table, Tag, Typography } from 'antd';
 import { TrophyOutlined } from '@ant-design/icons';
@@ -11,27 +13,6 @@ const mappingLabels: Record<BenchmarkModel['mapping'], string> = {
   version_ambiguous: '版本待确认',
   unverified: '暂无可核实数据',
 };
-
-const modelLogo: Record<string, { src: string; bg?: string }> = {
-  'GLM': { src: '/logo-glm.svg' },
-  'Kimi': { src: '/logo-kimi.svg' },
-  'Claude': { src: '/logo-claude.svg' },
-  'GPT': { src: '/logo-openai.svg' },
-  'DeepSeek': { src: '/logo-deepseek.svg' },
-  'MiniMax': { src: '/logo-minimax.svg' },
-  'Doubao': { src: '/logo-bytedance.svg' },
-  'JoyAI': { src: '/logo-jd.ico' },
-  'JoyCode': { src: '/logo-jd.ico' },
-};
-function logoFor(model: string) {
-  const key = (Object.keys(modelLogo) as string[]).find(k => model.startsWith(k));
-  return key ? modelLogo[key] : null;
-}
-function ModelLogo({ model, size = 22 }: { model: string; size?: number }) {
-  const logo = logoFor(model);
-  if (!logo) return null;
-  return <img src={logo.src} alt="" width={size} height={size} style={{ flexShrink: 0, objectFit: 'contain' }} />;
-}
 
 function pick(model: BenchmarkModel, sourceId: string): BenchmarkResult | undefined {
   if (model.mapping !== 'name_match') return undefined;
@@ -104,12 +85,12 @@ export default function ModelBenchmarks({ resource }: {
                   <ModelLogo model={id} />
                   <Typography.Text strong>{id}</Typography.Text></span> },
                 { title: 'AA 智能指数 v4.3', align: 'right', width: 150, render: (_, m) => m.aa !== null
-                  ? <Typography.Text strong style={{ fontSize: 16, color: '#22C55E' }}>{m.aa}</Typography.Text>
+                  ? <Typography.Text strong style={{ fontSize: 16, color: '#252A34' }}>{m.aa}</Typography.Text>
                   : <Typography.Text type="secondary">—</Typography.Text> },
                 { title: 'BenchLM 综合', align: 'right', width: 130, render: (_, m) => m.bl !== null
-                  ? <Typography.Text strong style={{ fontSize: 16, color: '#3B82F6' }}>{m.bl.toFixed(1)}</Typography.Text>
+                  ? <Typography.Text strong style={{ fontSize: 16, color: '#252A34' }}>{m.bl.toFixed(1)}</Typography.Text>
                   : <Typography.Text type="secondary">—</Typography.Text> },
-                { title: '对应关系', width: 175, render: (_, m) => <Tag color={m.mapping === 'name_match' ? 'blue' : 'default'}>{mappingLabels[m.mapping]}</Tag> },
+                { title: '对应关系', width: 175, render: (_, m) => <Tag color={'default'}>{mappingLabels[m.mapping]}</Tag> },
                 { title: '可核实维度 / 证据', render: (_, m) => <>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{m.variants.length} 条已核实记录</Typography.Text>
                   {m.link && <div><a href={m.link} target="_blank" rel="noopener noreferrer">来源详情 ↗</a></div>}
@@ -160,10 +141,10 @@ export default function ModelBenchmarks({ resource }: {
                 }} columns={[
                   { title: 'JoyCode 模型', dataIndex: 'id', width: 180, render: (id: string) => <Typography.Text strong>{id}</Typography.Text> },
                   { title: '公开最高档 · 指数', width: 155, render: (_, m) => m.best
-                    ? <Typography.Text strong style={{ fontSize: 21, color: '#22C55E' }}>{m.best.score}</Typography.Text>
+                    ? <Typography.Text strong style={{ fontSize: 21, color: '#252A34' }}>{m.best.score}</Typography.Text>
                     : <Typography.Text type="secondary">—</Typography.Text> },
                   { title: '公开评测档位', width: 130, render: (_, m) => m.best ? <Tag>{m.best.variant}</Tag> : '—' },
-                  { title: '对应关系', width: 180, render: (_, m) => <Tag color={m.mapping === 'name_match' ? 'blue' : 'default'}>{mappingLabels[m.mapping]}</Tag> },
+                  { title: '对应关系', width: 180, render: (_, m) => <Tag color={'default'}>{mappingLabels[m.mapping]}</Tag> },
                   { title: '说明 / 来源', render: (_, m) => <>
                     <Typography.Text type="secondary">{m.note}</Typography.Text>
                     {m.best && <div><a href={m.best.url} target="_blank" rel="noopener noreferrer">{m.best.public_model} · 原站详情 ↗</a></div>}

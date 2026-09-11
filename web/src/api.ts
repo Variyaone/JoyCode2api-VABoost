@@ -118,6 +118,22 @@ export interface CostSnapshot {
   rows: CostRow[];
 }
 
+export interface UsageActivity {
+  from: string;
+  through: string;
+  today: string;
+  timezone: string;
+  generated_at: string;
+  source: 'request_logs';
+  days: {
+    date: string;
+    coverage: 'matched' | 'partial' | 'unavailable';
+    raw_requests: number;
+    ledger_requests: number;
+    hours: { hour: number; requests: number; input_tokens: number; output_tokens: number }[];
+  }[];
+}
+
 export interface Settings {
   [key: string]: string;
 }
@@ -248,6 +264,8 @@ export const api = {
   listModels: () => request<{ models: ModelInfo[] }>('/api/models').then(r => r.models),
   listAccountModels: (userId: string) =>
     request<{ models: ModelInfo[] }>(`/api/accounts/${encodeURIComponent(userId)}/models`).then(r => r.models),
+  getUsageActivity: (from: string, through: string, signal?: AbortSignal) =>
+    request<UsageActivity>(`/api/usage-activity?from=${encodeURIComponent(from)}&through=${encodeURIComponent(through)}`, { signal }),
   getCosts: (signal?: AbortSignal) => request<CostSnapshot>('/api/costs', { signal }),
   getModelBenchmarks: (signal?: AbortSignal) => request<BenchmarkSnapshot>('/api/model-benchmarks', { signal }),
   getStats: (signal?: AbortSignal) => request<Stats>('/api/stats', { signal }),
@@ -282,8 +300,8 @@ export const api = {
     request<{ models: ModelCapability[]; upstream_cap_ctx: number; request_body_cap: number; probed_at: string }>('/api/model-capabilities', { signal }),
   getRecentLogs: (limit = 100, signal?: AbortSignal) =>
     request<{ logs: RequestLog[]; total: number }>(`/api/recent-logs?limit=${limit}`, { signal }),
-  getGitHubStars: () =>
-    request<{ stars: number }>('/api/github-stars').then(r => r.stars),
+  getRepoStars: (signal?: AbortSignal) =>
+    request<{ github: number; gitee: number; repos: { github: string; gitee: string } }>('/api/github-stars', { signal }),
   clearAllAccounts: () =>
     request<{ ok: boolean; count: number }>('/api/accounts-clear-all', { method: 'POST' }),
   clearJoyCodeSession: () =>

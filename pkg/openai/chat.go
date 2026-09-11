@@ -30,7 +30,12 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		systemDefault = s.store.GetSetting("default_model")
 	}
 	model := ResolveModel(req.Model, store.GetAccountDefaultModel(r), systemDefault)
-		store.SetModel(r, model)
+	req.Model = model
+	store.SetModel(r, model)
+	if model == "JoyCode-Base-V3" {
+		writeError(w, http.StatusBadRequest, "JoyCode-Base-V3 是代码补全模型，不支持聊天/工具会话。请选择目录中的聊天模型；不会自动替换为其他模型。")
+		return
+	}
 	client := s.getClient(r)
 	if joycode.IsResponsesAPIModel(model) {
 		s.handleResponsesModel(w, r, client, &req, model)
