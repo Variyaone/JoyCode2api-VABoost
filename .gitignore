@@ -67,3 +67,6 @@ web/node_modules/
 web/dist/
 joycode_proxy/static/
 .backup/
+*.exe
+deploy-*.ps1
+deploy-*.log
