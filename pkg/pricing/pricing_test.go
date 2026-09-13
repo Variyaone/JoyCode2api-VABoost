@@ -32,3 +32,31 @@ func TestRatesAndAliases(t *testing.T) {
 		t.Fatal("explicit alias missing")
 	}
 }
+
+// cny() stores tenths of micro-USD; the dashboard renders USD as
+// stored/10 and CNY as stored/10*7.2. Converting back must recover the
+// official CNY list price to within rounding (<1% was the 10x bug).
+func TestCNYRoundTrip(t *testing.T) {
+	cases := map[string][2]int64{
+		"GLM-5.3":            {8, 28},
+		"GLM-5.2-jcloud":     {8, 28},
+		"Kimi-K3":            {20, 100},
+		"Kimi-K3-jcloud":     {20, 100},
+		"Doubao-Seed-2.0-pro": {48, 240},
+	}
+	for _, r := range Rates {
+		want, ok := cases[r.Model]
+		if !ok {
+			continue
+		}
+		if r.Input == nil || r.Output == nil {
+			t.Fatalf("%s: missing rate", r.Model)
+		}
+		for i, got := range [2]int64{*r.Input, *r.Output} {
+			back := float64(got) / 10 * 7.2 // tenths of micro-USD -> CNY per 1M
+			if d := back - float64(want[i]); d < -1 || d > 1 {
+				t.Errorf("%s %s: stored %d renders ¥%.2f, official ¥%d", r.Model, []string{"input", "output"}[i], got, back, want[i])
+			}
+		}
+	}
+}

@@ -12,17 +12,18 @@ type Rate struct {
 	Note   string `json:"note"`
 }
 
-const Version = "public-base-2026-09-11-v3"
-const CollectedAt = "2026-09-11"
+const Version = "public-base-2026-09-14-v4"
+const CollectedAt = "2026-09-14"
 
 func n(v int64) *int64 { return &v }
 
 // Reference rate for display conversion only; not a live FX quote.
-const USDToCNumerator = 36 // CNY per 5 USD -> 7.2 exactly, avoids float
-const USDToCDenominator = 5
+const USDToC = 7.2 // CNY per USD
 
 // cny converts yuan per 1M tokens into tenths of micro-USD per token.
-func cny(yuan int64) *int64 { return n(yuan * 100 * USDToCDenominator / USDToCNumerator) }
+// yuan CNY per 1M tokens / 7.2 = USD per 1M tokens; 1 USD/1M tokens equals
+// 10 tenths-of-micro-USD per token, so yuan * 10 / 7.2 = yuan * 100 / 72.
+func cny(yuan int64) *int64 { return n(yuan * 100 / 72) }
 
 // Prices are reference base API rates, NOT JoyCode invoices. jcloud models
 // inherit the vendor list price of the same base model and are marked as such.

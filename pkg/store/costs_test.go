@@ -24,10 +24,10 @@ func TestCostsFormulaUnknownAndRetention(t *testing.T) {
 	}
 	for _, r := range rows {
 		// GLM-5.3 official CNY list price: ¥8 in / ¥28 out per MTok, at 7.2 CNY/USD
-		// gives rates 111/388 tenth-micro-USD per token (integer math truncates).
-		// 1M in + 1M out = 499,000,000 tenth-micro-USD = $49.90.
-		if r.Model == "GLM-5.3" && (r.Amount == nil || *r.Amount != 499000000) {
-			t.Fatalf("want $49.90, got %+v", r)
+		// gives rates 11/38 tenth-micro-USD per token (integer math truncates).
+		// 1M in + 1M out = 49,000,000 tenth-micro-USD = $4.90.
+		if r.Model == "GLM-5.3" && (r.Amount == nil || *r.Amount != 49000000) {
+			t.Fatalf("want $4.90, got %+v", r)
 		}
 		// Kimi-K3-jcloud now inherits the Kimi list price by request.
 		if r.Model == "Kimi-K3-jcloud" && r.Amount == nil {
