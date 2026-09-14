@@ -14,7 +14,6 @@ import { usageEconomics } from '../utils/usageEconomics';
 import ActivityHeatmap from '../components/ActivityHeatmap';
 import ResourceStatus from '../components/ResourceStatus';
 import OperationsDetails from './OperationsDetails';
-import ReportParticles from '../components/ReportParticles';
 
 export default function Dashboard() {
   const { autoRefresh, setAutoRefresh, health } = useOutletContext<DashboardOutletContext>();
@@ -35,7 +34,7 @@ export default function Dashboard() {
   const [activityRefresh, setActivityRefresh] = useState(0);
   const refresh = () => { setActivityRefresh(value => value + 1); return Promise.all([costs.refresh(), health.refresh()]); };
   return <div className="jc-page jc-usage-report">
-    <header className="jc-report-title"><div className="jc-report-heading"><h1>用量与消耗</h1><p>用了多少、花了多少，以及消耗在哪些模型和时段。</p></div><ReportParticles /></header>
+    <header className="jc-report-title"><div className="jc-report-heading"><h1>用量与消耗</h1><p>用了多少、花了多少，以及消耗在哪些模型和时段。</p></div></header>
     <div className="jc-report-toolbar">
       <Tabs activeKey={panel} onChange={setPanel} items={[{ key: 'overview', label: 'Overview' }, { key: 'models', label: 'Models' }]} />
       <Segmented aria-label="统一统计时间范围" value={range} onChange={value => setRange(value as UsageRange)} options={[{ label: 'All', value: 'all' }, { label: '30d', value: '30d' }, { label: '7d', value: '7d' }]} />
