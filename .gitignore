@@ -70,3 +70,9 @@ joycode_proxy/static/
 *.exe
 deploy-*.ps1
 deploy-*.log
+
+# Runtime data and local deploy tooling
+data/*.db
+data/*.db-*
+deploy.ps1
+deploy.log
