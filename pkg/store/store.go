@@ -34,6 +34,11 @@ type Account struct {
 	IsDefault    bool   `json:"is_default"`
 	DefaultModel string `json:"default_model"`
 	CreatedAt    string `json:"created_at,omitempty"`
+
+	// Provider identifies the backend. Empty / "joycode" = JoyCode (pt_key).
+	// "openclaw" = JoyMe llm-gateway, auth via the local 京ME desktop
+	// (HiOffice) — no per-account credentials exist for this provider.
+	Provider string `json:"provider"`
 }
 
 func (a *Account) DisplayName() string {
@@ -60,6 +65,7 @@ type AccountInfo struct {
 	TodayRequests   int    `json:"today_requests"`
 	TotalTokens     int    `json:"total_tokens"`
 	TodayTokens     int    `json:"today_tokens"`
+	Provider        string `json:"provider"` // "" / "joycode" / "openclaw"
 	CredentialValid      int    `json:"credential_valid"`               // -1=unknown, 0=expired, 1=valid
 	CredentialCheckedAt string `json:"credential_checked_at,omitempty"`
 	CredentialRefreshAt string `json:"credential_refreshed_at,omitempty"`
@@ -286,6 +292,20 @@ func (s *Store) migrate() error {
 
 	// Migration: add display_order column to accounts
 	if err := addColumnIfMissing(s.db, "accounts", "display_order", "INTEGER DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migration: openclaw backend columns on accounts
+	if err := addColumnIfMissing(s.db, "accounts", "provider", "TEXT DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(s.db, "accounts", "openclaw_jmechat_token", "TEXT DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(s.db, "accounts", "openclaw_device_id", "TEXT DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(s.db, "accounts", "openclaw_tenant_code", "TEXT DEFAULT ''"); err != nil {
 		return err
 	}
 
@@ -692,8 +712,57 @@ func (s *Store) AddAccount(userID, ptKey, nickname string, isDefault bool, defau
 	return nil
 }
 
+// AddOpenClawAccount registers an openclaw-backed account. The openclaw
+// backend has no per-account credentials — auth is always acquired on demand
+// from the local 京ME desktop (HiOffice) — so an account is just a routing
+// identity plus default model. The pt_key column is NOT NULL, so we store an
+// empty encrypted blob.
+func (s *Store) AddOpenClawAccount(userID, nickname, defaultModel string, isDefault bool) error {
+	if userID == "" {
+		return fmt.Errorf("user_id cannot be empty")
+	}
+	if defaultModel == "" {
+		defaultModel = "JoyAI"
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	encEmpty, err := s.encrypt("")
+	if err != nil {
+		return fmt.Errorf("encrypt placeholder: %w", err)
+	}
+
+	// Upsert
+	var existing string
+	err = s.db.QueryRow("SELECT user_id FROM accounts WHERE user_id = ?", userID).Scan(&existing)
+	if err == nil {
+		_, err = s.db.Exec(
+			"UPDATE accounts SET provider='openclaw', nickname=CASE WHEN nickname='' OR nickname IS NULL THEN ? ELSE nickname END, default_model=?, updated_at=datetime('now','localtime') WHERE user_id=?",
+			nickname, defaultModel, userID,
+		)
+		return err
+	}
+
+	if isDefault {
+		s.db.Exec("UPDATE accounts SET is_default = 0 WHERE is_default = 1")
+	}
+	def := 0
+	if isDefault {
+		def = 1
+	}
+	var maxOrder int
+	s.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM accounts").Scan(&maxOrder)
+	token := generateToken()
+	_, err = s.db.Exec(
+		"INSERT INTO accounts (user_id, nickname, api_token, pt_key, is_default, default_model, display_order, provider) VALUES (?, ?, ?, ?, ?, ?, ?, 'openclaw')",
+		userID, nickname, token, encEmpty, def, defaultModel, maxOrder+1,
+	)
+	return err
+}
+
 func (s *Store) ListAccounts() ([]AccountInfo, error) {
-	rows, err := s.db.Query("SELECT user_id, nickname, remark, api_token, is_default, default_model, created_at, credential_valid, credential_refreshed_at, COALESCE(display_order, 0) FROM accounts ORDER BY display_order, created_at")
+	rows, err := s.db.Query("SELECT user_id, nickname, remark, api_token, is_default, default_model, created_at, credential_valid, credential_refreshed_at, COALESCE(display_order, 0), COALESCE(provider, '') FROM accounts ORDER BY display_order, created_at")
 	if err != nil {
 		slog.Error("store: list accounts query failed", "error", err)
 		return nil, err
@@ -704,11 +773,14 @@ func (s *Store) ListAccounts() ([]AccountInfo, error) {
 	for rows.Next() {
 		var a AccountInfo
 		var isDef int
-		if err := rows.Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &isDef, &a.DefaultModel, &a.CreatedAt, &a.CredentialValid, &a.CredentialRefreshAt, &a.DisplayOrder); err != nil {
+		if err := rows.Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &isDef, &a.DefaultModel, &a.CreatedAt, &a.CredentialValid, &a.CredentialRefreshAt, &a.DisplayOrder, &a.Provider); err != nil {
 			slog.Error("store: list accounts scan failed", "error", err)
 			return nil, err
 		}
 		a.IsDefault = isDef == 1
+		if a.Provider == "" {
+			a.Provider = "joycode"
+		}
 		a.CredentialCheckedAt = a.CredentialRefreshAt
 		accounts = append(accounts, a)
 	}
@@ -756,14 +828,22 @@ func (s *Store) FillAccountStats(accounts []AccountInfo) {
 	}
 }
 
+// scanProvider normalizes the provider column: empty means the legacy
+// default "joycode". The openclaw provider carries no per-account credentials.
+func scanProvider(a *Account) {
+	if a.Provider == "" {
+		a.Provider = "joycode"
+	}
+}
+
 func (s *Store) GetAccount(userID string) (*Account, error) {
 	var a Account
 	var encPtKey string
 	var isDef int
 	err := s.db.QueryRow(
-		"SELECT user_id, nickname, remark, api_token, pt_key, is_default, default_model, created_at FROM accounts WHERE user_id = ?",
+		"SELECT user_id, nickname, remark, api_token, pt_key, is_default, default_model, created_at, provider FROM accounts WHERE user_id = ?",
 		userID,
-	).Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &encPtKey, &isDef, &a.DefaultModel, &a.CreatedAt)
+	).Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &encPtKey, &isDef, &a.DefaultModel, &a.CreatedAt, &a.Provider)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -772,12 +852,15 @@ func (s *Store) GetAccount(userID string) (*Account, error) {
 		return nil, err
 	}
 
-	ptKey, err := s.decrypt(encPtKey)
-	if err != nil {
-		slog.Error("store: decrypt pt_key failed", "user_id", userID, "error", err)
-		return nil, fmt.Errorf("decrypt pt_key: %w", err)
+	if encPtKey != "" {
+		ptKey, err := s.decrypt(encPtKey)
+		if err != nil {
+			slog.Error("store: decrypt pt_key failed", "user_id", userID, "error", err)
+			return nil, fmt.Errorf("decrypt pt_key: %w", err)
+		}
+		a.PtKey = ptKey
 	}
-	a.PtKey = ptKey
+	scanProvider(&a)
 	a.IsDefault = isDef == 1
 	return &a, nil
 }
@@ -787,9 +870,9 @@ func (s *Store) GetAccountByToken(token string) (*Account, error) {
 	var encPtKey string
 	var isDef int
 	err := s.db.QueryRow(
-		"SELECT user_id, nickname, remark, api_token, pt_key, is_default, default_model, created_at FROM accounts WHERE api_token = ?",
+		"SELECT user_id, nickname, remark, api_token, pt_key, is_default, default_model, created_at, provider FROM accounts WHERE api_token = ?",
 		token,
-	).Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &encPtKey, &isDef, &a.DefaultModel, &a.CreatedAt)
+	).Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &encPtKey, &isDef, &a.DefaultModel, &a.CreatedAt, &a.Provider)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -798,12 +881,15 @@ func (s *Store) GetAccountByToken(token string) (*Account, error) {
 		return nil, err
 	}
 
-	ptKey, err := s.decrypt(encPtKey)
-	if err != nil {
-		slog.Error("store: decrypt pt_key by token failed", "error", err)
-		return nil, fmt.Errorf("decrypt pt_key: %w", err)
+	if encPtKey != "" {
+		ptKey, err := s.decrypt(encPtKey)
+		if err != nil {
+			slog.Error("store: decrypt pt_key by token failed", "error", err)
+			return nil, fmt.Errorf("decrypt pt_key: %w", err)
+		}
+		a.PtKey = ptKey
 	}
-	a.PtKey = ptKey
+	scanProvider(&a)
 	a.IsDefault = isDef == 1
 	return &a, nil
 }
@@ -822,8 +908,8 @@ func (s *Store) GetDefaultAccount() (*Account, error) {
 	var a Account
 	var encPtKey string
 	err := s.db.QueryRow(
-		"SELECT user_id, nickname, remark, api_token, pt_key, is_default, default_model, created_at FROM accounts WHERE is_default = 1 LIMIT 1",
-	).Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &encPtKey, new(int), &a.DefaultModel, &a.CreatedAt)
+		"SELECT user_id, nickname, remark, api_token, pt_key, is_default, default_model, created_at, provider FROM accounts WHERE is_default = 1 LIMIT 1",
+	).Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &encPtKey, new(int), &a.DefaultModel, &a.CreatedAt, &a.Provider)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -832,12 +918,15 @@ func (s *Store) GetDefaultAccount() (*Account, error) {
 		return nil, err
 	}
 
-	ptKey, err := s.decrypt(encPtKey)
-	if err != nil {
-		slog.Error("store: decrypt default account pt_key failed", "error", err)
-		return nil, fmt.Errorf("decrypt pt_key: %w", err)
+	if encPtKey != "" {
+		ptKey, err := s.decrypt(encPtKey)
+		if err != nil {
+			slog.Error("store: decrypt default account pt_key failed", "error", err)
+			return nil, fmt.Errorf("decrypt pt_key: %w", err)
+		}
+		a.PtKey = ptKey
 	}
-	a.PtKey = ptKey
+	scanProvider(&a)
 	a.IsDefault = true
 	return &a, nil
 }
@@ -928,10 +1017,11 @@ func (s *Store) ListStaleAccounts(threshold time.Duration) ([]Account, error) {
 	backoffCutoff := time.Now().Add(-threshold * 4).Format("2006-01-02 15:04:05")
 	rows, err := s.db.Query(
 		`SELECT user_id, nickname, pt_key, default_model FROM accounts
-		 WHERE credential_refreshed_at = ''
+		 WHERE (provider IS NULL OR provider = '' OR provider = 'joycode')
+		   AND (credential_refreshed_at = ''
 		    OR credential_valid = -1
 		    OR (credential_valid = 1 AND credential_refreshed_at < ?)
-		    OR (credential_valid = 0 AND credential_refreshed_at < ?)
+		    OR (credential_valid = 0 AND credential_refreshed_at < ?))
 		 ORDER BY created_at`,
 		normalCutoff, backoffCutoff,
 	)

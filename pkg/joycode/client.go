@@ -95,6 +95,13 @@ type Client struct {
 	LoginType      string
 	OrgFullName    string
 	httpClient     *http.Client
+
+	// OpenClaw backend (llm-gateway at joyme-server). Empty Provider means the
+	// JoyCode (pt_key) backend. Set via SetOpenClawContext; the openclaw
+	// backend carries no per-account credentials — auth is acquired on
+	// demand from the local 京ME desktop (HiOffice).
+	Provider string
+	openClaw *openClawState
 }
 
 type gzipReadCloser struct {
@@ -386,6 +393,9 @@ func decodeStreamBody(resp *http.Response) error {
 }
 
 func (c *Client) Post(endpoint string, body map[string]interface{}) (map[string]interface{}, error) {
+	if c.IsOpenClaw() {
+		return c.openClawPost(body)
+	}
 	resp, err := c.doPost(endpoint, c.prepareBody(body))
 	if err != nil {
 		slog.Error("upstream request failed", "endpoint", endpoint, "error", err)
@@ -409,6 +419,9 @@ func (c *Client) Post(endpoint string, body map[string]interface{}) (map[string]
 }
 
 func (c *Client) PostStream(endpoint string, body map[string]interface{}) (*http.Response, error) {
+	if c.IsOpenClaw() {
+		return c.openClawPostStream(body)
+	}
 	resp, err := c.doPostStream(endpoint, c.prepareBody(body))
 	if err != nil {
 		slog.Error("upstream stream connect", "endpoint", endpoint, "error", err)
@@ -428,6 +441,9 @@ func (c *Client) PostStream(endpoint string, body map[string]interface{}) (*http
 }
 
 func (c *Client) PostAnthropicStream(endpoint string, body map[string]interface{}) (*http.Response, error) {
+	if c.IsOpenClaw() {
+		return c.openClawPostAnthropicStream(body)
+	}
 	resp, err := c.doAnthropicPostStream(endpoint, c.prepareAnthropicBody(body))
 	if err != nil {
 		slog.Error("upstream anthropic stream connect", "endpoint", endpoint, "error", err)

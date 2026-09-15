@@ -149,6 +149,9 @@ const Accounts: React.FC = () => {
   const [form] = Form.useForm();
   const [validating, setValidating] = useState<string | null>(null);
   const [autoLogging, setAutoLogging] = useState(false);
+  const [openClawModalOpen, setOpenClawModalOpen] = useState(false);
+  const [openClawForm] = Form.useForm();
+
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<string>('');
@@ -193,6 +196,18 @@ const Accounts: React.FC = () => {
       fetchAccounts();
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : '添加账号失败');
+    }
+  };
+
+  const handleAddOpenClaw = async (values: { user_id: string; nickname?: string; default_model?: string; is_default?: boolean }) => {
+    try {
+      await api.addOpenClawAccount(values);
+      message.success(`OpenClaw 账号「${values.user_id}」添加成功`);
+      setOpenClawModalOpen(false);
+      openClawForm.resetFields();
+      fetchAccounts();
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : '添加 OpenClaw 账号失败');
     }
   };
 
@@ -304,6 +319,9 @@ const Accounts: React.FC = () => {
           <Space size={6} style={{ minWidth: 0 }}>
             {record.is_default && (
               <StarFilled style={{ color: '#5966A6', fontSize: 13, flexShrink: 0 }} />
+            )}
+            {record.provider === 'openclaw' && (
+              <Tag color="purple" style={{ marginInlineEnd: 0, fontSize: 11, padding: '0 4px', lineHeight: '16px' }}>OpenClaw</Tag>
             )}
             <Typography.Text strong ellipsis style={{ minWidth: 0 }}>
               {accountDisplayName(record)}
@@ -604,6 +622,9 @@ const Accounts: React.FC = () => {
           <Button onClick={() => setModalOpen(true)} icon={<PlusOutlined />}>
             手动添加
           </Button>
+          <Button onClick={() => setOpenClawModalOpen(true)} icon={<PlusOutlined />}>
+            添加 OpenClaw 账号
+          </Button>
         </Space>
       </div>
       <Alert
@@ -753,6 +774,58 @@ const Accounts: React.FC = () => {
             rules={[{ required: true, message: '请输入备注名' }]}
           >
             <Input placeholder="输入备注名，例如：我的主账号" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="添加 OpenClaw 账号"
+        open={openClawModalOpen}
+        onCancel={() => { setOpenClawModalOpen(false); openClawForm.resetFields(); }}
+        onOk={() => openClawForm.submit()}
+        okText="添加"
+        cancelText="取消"
+        width={560}
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="无需任何凭证"
+          description="OpenClaw 账号只是一个路由标识。授权自动走本机京ME桌面端（HiOffice）换取 me_token（约24h，自动续期），保持京ME桌面端在运行即可。"
+          style={{ marginBottom: 12 }}
+        />
+        <Form form={openClawForm} layout="vertical" onFinish={handleAddOpenClaw}>
+          <Form.Item
+            name="user_id"
+            label="账号 ID"
+            rules={[{ required: true, message: '请输入账号 ID' }]}
+          >
+            <Input placeholder="例如 openclaw-variya（任意标识，用于路由）" />
+          </Form.Item>
+          <Form.Item
+            name="nickname"
+            label="昵称（可选）"
+          >
+            <Input placeholder="例如 OpenClaw" />
+          </Form.Item>
+          <Form.Item
+            name="default_model"
+            label="默认模型"
+            initialValue="JoyAI"
+          >
+            <Select
+              options={[
+                { label: 'JoyAI', value: 'JoyAI' },
+                { label: 'Dr.Joy', value: 'Dr.Joy' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            name="is_default"
+            valuePropName="checked"
+            label="设为默认账号"
+          >
+            <Switch />
           </Form.Item>
         </Form>
       </Modal>
