@@ -9,7 +9,7 @@ export function credentialState(value: unknown): 'passed' | 'failed' | 'unknown'
 }
 
 export interface AccountCredentialStatusProps {
-  account: Pick<Account, 'credential_valid' | 'credential_checked_at'>;
+  account: Pick<Account, 'credential_valid' | 'credential_checked_at' | 'provider'>;
   compact?: boolean;
 }
 
@@ -35,8 +35,15 @@ export default function AccountCredentialStatus({ account, compact = false }: Ac
   const state = credentialState(account.credential_valid);
   const { label, color, icon } = states[state];
   const time = `记录时间：${recordTime(account.credential_checked_at)}`;
-  const explanation = '后端保存的历史校验记录，不是实时上游探测，不能代表当前上游连通性。';
-  const failureExplanation = state === 'failed' ? '失败可能由网络或认证问题导致，不表示已确认过期。' : '';
+  const isOpenClaw = account.provider === 'openclaw';
+  const explanation = isOpenClaw
+    ? 'OpenClaw 无账号级凭证：校验走本机京ME桌面端（HiOffice）实时换取 me_token，通过代表后端当前可用。'
+    : '后端保存的历史校验记录，不是实时上游探测，不能代表当前上游连通性。';
+  const failureExplanation = state === 'failed'
+    ? (isOpenClaw
+      ? '失败通常意味着京ME桌面端未运行或未登录，启动并登录后重试即可。'
+      : '失败可能由网络或认证问题导致，不表示已确认过期。')
+    : '';
 
   return (
     <Tooltip title={`${explanation}${failureExplanation}${time}`} trigger={['hover', 'focus']}>

@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -57,6 +58,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	// Dashboard endpoints (JWT required — enforced by middleware)
 	mux.HandleFunc("/api/accounts", h.handleAccounts)
+	mux.HandleFunc("/api/accounts-openclaw", h.handleAddOpenClawAccount)
 	mux.HandleFunc("/api/accounts/", h.handleAccountAction)
 	mux.HandleFunc("/api/accounts-auto-login", h.handleAutoLogin)
 	mux.HandleFunc("/api/accounts-clear-all", h.handleClearAllAccounts)
@@ -79,6 +81,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/github-stars", h.handleRepoStars)
 	mux.HandleFunc("/api/accounts-export", h.handleExportAccounts)
 	mux.HandleFunc("/api/accounts-import", h.handleImportAccounts)
+	mux.HandleFunc("/api/joyme/device-hints", h.handleJoymeDeviceHints)
 }
 
 // Repo Stars cache
@@ -601,6 +604,41 @@ func (h *Handler) addAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "user_id": body.UserID, "nickname": body.Nickname})
+}
+
+func (h *Handler) handleAddOpenClawAccount(w http.ResponseWriter, r *http.Request) {
+	setCors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var body struct {
+		UserID       string `json:"user_id"`
+		Nickname     string `json:"nickname"`
+		DefaultModel string `json:"default_model"`
+		IsDefault    *bool  `json:"is_default"`
+	}
+	if !readJSONBody(w, r, &body) {
+		return
+	}
+	if body.UserID == "" {
+		writeError(w, http.StatusBadRequest, "user_id is required")
+		return
+	}
+	isDefault := false
+	if body.IsDefault != nil {
+		isDefault = *body.IsDefault
+	}
+	if err := h.store.AddOpenClawAccount(body.UserID, body.Nickname, body.DefaultModel, isDefault); err != nil {
+		slog.Error("add openclaw account", "user_id", body.UserID, "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "user_id": body.UserID, "nickname": body.Nickname})
 }
 
@@ -1146,12 +1184,21 @@ func (h *Handler) validateAccount(w http.ResponseWriter, r *http.Request, apiKey
 		return
 	}
 
-	client := joycode.NewClient(account.PtKey, account.UserID)
 	valid := true
-	if err := client.Validate(); err != nil {
-		valid = false
-		slog.Error("validate account", "api_key", apiKey, "error", err)
+	var validateErr error
+	if account.Provider == "openclaw" {
+		client := joycode.NewClient("", account.UserID)
+		client.SetOpenClawContext()
+		validateErr = client.ValidateOpenClaw()
+	} else {
+		client := joycode.NewClient(account.PtKey, account.UserID)
+		validateErr = client.Validate()
 	}
+	if validateErr != nil {
+		valid = false
+		slog.Error("validate account", "api_key", apiKey, "provider", account.Provider, "error", validateErr)
+	}
+	h.store.SetCredentialValid(apiKey, valid)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"api_key": apiKey, "valid": valid})
 }
@@ -1258,6 +1305,61 @@ func (h *Handler) updateRemark(w http.ResponseWriter, r *http.Request, userID st
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "user_id": userID, "remark": body.Remark})
+}
+
+// handleJoymeDeviceHints scans the local JoyME desktop Local Storage leveldb for
+// deviceId / deviceMachineNumber, returning whatever it finds so the dashboard
+// can pre-fill the OpenClaw account form. Best-effort: empty list is not an error.
+func (h *Handler) handleJoymeDeviceHints(w http.ResponseWriter, r *http.Request) {
+	setCors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	type hint struct {
+		Kind  string `json:"kind"`
+		Value string `json:"value"`
+	}
+	hints := []hint{}
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			localAppData = filepath.Join(home, "AppData", "Local")
+		}
+	}
+	if localAppData != "" {
+		leveldbDir := filepath.Join(localAppData, "JoyME", "User Data", "Default", "Local Storage", "leveldb")
+		entries, _ := os.ReadDir(leveldbDir)
+		devRe := regexp.MustCompile(`deviceMachineNumber.{1,4}?([0-9a-fA-F]{32}hioh)`)
+		guidRe := regexp.MustCompile(`deviceId.{1,4}?([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})`)
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			if !strings.HasSuffix(name, ".log") && !strings.HasPrefix(name, "MANIFEST") {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(leveldbDir, name))
+			if err != nil {
+				continue
+			}
+			if m := devRe.FindSubmatch(data); m != nil {
+				hints = append(hints, hint{Kind: "deviceMachineNumber", Value: string(m[1])})
+			}
+			if m := guidRe.FindSubmatch(data); m != nil {
+				hints = append(hints, hint{Kind: "deviceId", Value: string(m[1])})
+			}
+			if len(hints) > 0 {
+				break
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"hints": hints})
 }
 
 func (h *Handler) handleClearJoyCodeSession(w http.ResponseWriter, r *http.Request) {
