@@ -75,6 +75,24 @@ var Models = []string{
 // not fall back to a chat model, but do not belong in the supported chat catalog.
 func IsCompletionOnlyModel(model string) bool { return model == "JoyCode-Base-V3" }
 
+// KnownTextOnlyModels lists chat models confirmed to have no image input
+// support (dashboard probe 2026-09-10: vision=false in both the openai
+// ModelCapabilities registry and the measured capability matrix). Requests
+// targeting them get image blocks preemptively replaced with a text
+// placeholder. Models absent from this list are assumed vision-capable; only
+// an explicit upstream image error triggers a one-shot strip-and-retry
+// (see pkg/anthropic/resilience.go).
+var KnownTextOnlyModels = map[string]bool{
+	"JoyAI-Code-1.5":      true,
+	"GLM-5.3":             true,
+	"GLM-5.2-jcloud":      true,
+	"DeepSeek-V4-Pro":     true,
+	"Doubao-Seed-2.0-pro": true,
+}
+
+// IsKnownTextOnlyModel reports whether the model is confirmed text-only.
+func IsKnownTextOnlyModel(model string) bool { return KnownTextOnlyModels[model] }
+
 // IsResponsesAPIModel reports whether the model is served through the OpenAI
 // Responses API (/api/saas/openai/v1/responses) rather than chat completions.
 // GPT-family models on the JoyCode platform reject the chat path with

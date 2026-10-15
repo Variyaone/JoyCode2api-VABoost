@@ -94,6 +94,12 @@ func (h *Handler) handleMessages(w http.ResponseWriter, r *http.Request) {
 		writeAnthropicRequestError(w, fmt.Sprintf("thinking.budget_tokens (%d) 必须小于有效 max_tokens (%d，兼容上限 32768)。请显式降低 budget_tokens；请求未发送到上游。", req.Thinking.BudgetTokens, req.MaxTokens))
 		return
 	}
+	// Preemptive image stripping for confirmed text-only models (registry in
+	// pkg/joycode). Vision-capable and unknown models keep their images; a
+	// hard upstream image rejection still gets the one-shot fallback retry.
+	if n := StripImagesForTextOnlyModel(&req, resolved); n > 0 {
+		reqLog(r).Info("stripped image blocks for text-only model", "model", resolved, "replaced", n)
+	}
 	reqLog(r).Info("anthropic request", "model", req.Model, "resolved", resolved, "stream", req.Stream, "max_tokens", req.MaxTokens, "messages", len(req.Messages), "tools", len(req.Tools))
 
 	client := h.getClient(r)
@@ -132,14 +138,30 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 		respBody := joycode.ChatToResponses(jcBody)
 		resp, err := client.PostStream("/api/saas/openai/v1/responses", respBody)
 		if err != nil {
-			reqLog(r).Error("responses (non-stream) upstream error", "error", err)
-			msg := err.Error()
-			if isTimeoutError(err) {
-				writeAnthropicError(w, 504, "上游服务响应超时，请稍后重试。原始错误: "+msg)
+			// One-shot content repair before anything reaches the client.
+			errMsg := err.Error()
+			if isThinkingSignatureError(errMsg) && stripThinkingBlocks(req) > 0 {
+				reqLog(r).Warn("upstream rejected thinking signature, retrying without thinking blocks (responses non-stream)", "error", truncate(errMsg, 300))
+			} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
+				reqLog(r).Warn("upstream rejected image input, retrying with placeholders (responses non-stream)", "error", truncate(errMsg, 300))
+			} else {
+				reqLog(r).Error("responses (non-stream) upstream error", "error", err)
+				msg := errMsg
+				if isTimeoutError(err) {
+					writeAnthropicError(w, 504, "上游服务响应超时，请稍后重试。原始错误: "+msg)
+					return
+				}
+				writeAnthropicError(w, 500, msg)
 				return
 			}
-			writeAnthropicError(w, 500, msg)
-			return
+			jcBody = TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			jcBody["stream"] = true
+			respBody = joycode.ChatToResponses(jcBody)
+			resp, err = client.PostStream("/api/saas/openai/v1/responses", respBody)
+			if err != nil {
+				writeAnthropicError(w, 500, err.Error())
+				return
+			}
 		}
 		defer resp.Body.Close()
 
@@ -176,6 +198,12 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		jcResp, lastErr = client.Post(chatEndpoint, jcBody)
 		if lastErr != nil {
+			// Deterministic content rejections (thinking signature, image input)
+			// are handled by the one-shot repair below — an identical retry
+			// can only fail the same way.
+			if isThinkingSignatureError(lastErr.Error()) || isImageUnsupportedError(lastErr.Error()) {
+				break
+			}
 			if isContextLimitError(lastErr.Error()) {
 				// Progressive truncation on context limit
 				if truncateMessages(req) {
@@ -202,18 +230,39 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 			writeAnthropicRequestError(w, "上下文长度超出模型限制。请压缩对话历史或开启新对话。原始错误: "+errMsg)
 			return
 		}
-		if isTimeoutError(lastErr) {
-			reqLog(r).Error("upstream timeout after retries", "error", lastErr)
-			writeAnthropicError(w, 504, "上游服务响应超时，请稍后重试。如果问题持续，请尝试减少上下文长度或开启新对话。原始错误: "+errMsg)
+		// One-shot content repair: a rejected thinking signature is always a
+		// replayed history block, and an image rejection on a vision-listed
+		// model is still recoverable by degrading to a placeholder.
+		if isThinkingSignatureError(errMsg) && stripThinkingBlocks(req) > 0 {
+			reqLog(r).Warn("upstream rejected thinking signature, retrying without thinking blocks (non-stream)", "error", truncate(errMsg, 300))
+			jcBody = TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			jcResp, lastErr = client.Post(chatEndpoint, jcBody)
+			if lastErr != nil {
+				writeAnthropicError(w, 500, lastErr.Error())
+				return
+			}
+		} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
+			reqLog(r).Warn("upstream rejected image input, retrying with placeholders (non-stream)", "error", truncate(errMsg, 300))
+			jcBody = TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			jcResp, lastErr = client.Post(chatEndpoint, jcBody)
+			if lastErr != nil {
+				writeAnthropicError(w, 500, lastErr.Error())
+				return
+			}
+		} else {
+			if isTimeoutError(lastErr) {
+				reqLog(r).Error("upstream timeout after retries", "error", lastErr)
+				writeAnthropicError(w, 504, "上游服务响应超时，请稍后重试。如果问题持续，请尝试减少上下文长度或开启新对话。原始错误: "+errMsg)
+				return
+			}
+			if strings.Contains(errMsg, "content_filter") || strings.Contains(errMsg, "SENSITIVE_CONTENT") {
+				reqLog(r).Warn("upstream content_filter (non-stream), returning detailed error")
+				writeContentFilterError(w, errMsg)
+				return
+			}
+			writeAnthropicError(w, 500, errMsg)
 			return
 		}
-		if strings.Contains(errMsg, "content_filter") || strings.Contains(errMsg, "SENSITIVE_CONTENT") {
-			reqLog(r).Warn("upstream content_filter (non-stream), returning detailed error")
-			writeContentFilterError(w, errMsg)
-			return
-		}
-		writeAnthropicError(w, 500, errMsg)
-		return
 	}
 	// Check for content_filter in non-stream response
 	if choices, ok := jcResp["choices"].([]interface{}); ok && len(choices) > 0 {
@@ -346,6 +395,26 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *Mess
 		jcBody = TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
 		jcBody["stream"] = true
 		resp, err = h.connectStreamWithRetry(r, jcBody, client)
+	}
+	// One-shot content repair before SSE headers are committed: rejected
+	// thinking signatures and image inputs are recoverable by rewriting the
+	// history (the client has not received anything yet, so the repair is
+	// invisible — it just looks like a slow first token).
+	if err != nil {
+		errMsg := err.Error()
+		repaired := false
+		if isThinkingSignatureError(errMsg) && stripThinkingBlocks(req) > 0 {
+			reqLog(r).Warn("upstream rejected thinking signature, retrying without thinking blocks (stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
+			reqLog(r).Warn("upstream rejected image input, retrying with placeholders (stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		}
+		if repaired {
+			jcBody = TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			jcBody["stream"] = true
+			resp, err = h.connectStreamWithRetry(r, jcBody, client)
+		}
 	}
 	close(stopHeartbeat)
 	<-heartbeatDone
@@ -565,6 +634,26 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 	}()
 
 	resp, err := client.PostStream("/api/saas/openai/v1/responses", body)
+	// One-shot content repair: SSE headers and message_start were committed
+	// above, but a repaired request that succeeds produces a normal full
+	// message, so the client just sees a slow start.
+	if err != nil {
+		errMsg := err.Error()
+		repaired := false
+		if isThinkingSignatureError(errMsg) && stripThinkingBlocks(req) > 0 {
+			reqLog(r).Warn("upstream rejected thinking signature, retrying without thinking blocks (responses stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
+			reqLog(r).Warn("upstream rejected image input, retrying with placeholders (responses stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		}
+		if repaired {
+			jcBody := TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			jcBody["stream"] = true
+			body = joycode.ChatToResponses(jcBody)
+			resp, err = client.PostStream("/api/saas/openai/v1/responses", body)
+		}
+	}
 	close(stopHeartbeat)
 	<-heartbeatDone
 	if err != nil {
@@ -656,6 +745,24 @@ func (h *Handler) handleNativeAnthropicStream(w http.ResponseWriter, r *http.Req
 	}()
 
 	resp, err := h.connectNativeAnthropicStreamWithRetry(r, body, client)
+	// One-shot content repair while the client has only seen SSE comments:
+	// rejected thinking signatures / image inputs are recoverable by
+	// rewriting the history before any real event is emitted.
+	if err != nil {
+		errMsg := err.Error()
+		repaired := false
+		if isThinkingSignatureError(errMsg) && stripThinkingBlocks(req) > 0 {
+			reqLog(r).Warn("native upstream rejected thinking signature, retrying without thinking blocks (stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
+			reqLog(r).Warn("native upstream rejected image input, retrying with placeholders (stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		}
+		if repaired {
+			body = TranslateAnthropicRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			resp, err = h.connectNativeAnthropicStreamWithRetry(r, body, client)
+		}
+	}
 	close(stopHeartbeat)
 	<-heartbeatDone
 	if err != nil {
@@ -733,6 +840,23 @@ func (h *Handler) handleNativeAnthropicNonStream(w http.ResponseWriter, r *http.
 	logRequestDetails(r, "translated native anthropic request (non-stream)", body)
 
 	resp, err := h.connectNativeAnthropicStreamWithRetry(r, body, client)
+	// Same one-shot repair as the stream path: nothing has been written to
+	// the client yet, so fixing the history costs nothing observable.
+	if err != nil {
+		errMsg := err.Error()
+		repaired := false
+		if isThinkingSignatureError(errMsg) && stripThinkingBlocks(req) > 0 {
+			reqLog(r).Warn("native upstream rejected thinking signature, retrying without thinking blocks (non-stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
+			reqLog(r).Warn("native upstream rejected image input, retrying with placeholders (non-stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		}
+		if repaired {
+			body = TranslateAnthropicRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			resp, err = h.connectNativeAnthropicStreamWithRetry(r, body, client)
+		}
+	}
 	if err != nil {
 		reqLog(r).Error("native anthropic non-stream failed after retries", "error", err)
 		writeAnthropicError(w, 500, err.Error())
@@ -865,6 +989,12 @@ func (h *Handler) connectNativeAnthropicStreamWithRetry(r *http.Request, body ma
 		if err != nil {
 			lastErr = err
 			reqLog(r).Error("native anthropic stream connect error", "attempt", attempt, "max", maxRetries, "error", err)
+			// Deterministic content rejections (thinking signature, image
+			// input) go to the caller's one-shot repair; identical retries
+			// can only fail the same way.
+			if isThinkingSignatureError(err.Error()) || isImageUnsupportedError(err.Error()) {
+				return nil, lastErr
+			}
 			if attempt < maxRetries {
 				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
 			}
@@ -883,6 +1013,12 @@ func (h *Handler) connectNativeAnthropicStreamWithRetry(r *http.Request, body ma
 		if err := nativeAnthropicLineError(firstLine); err != nil {
 			resp.Body.Close()
 			lastErr = err
+			// Deterministic content rejections (thinking signature, image
+			// input) go to the one-shot repair path; identical retries only
+			// burn the caller's time.
+			if isThinkingSignatureError(err.Error()) || isImageUnsupportedError(err.Error()) {
+				return nil, lastErr
+			}
 			if attempt < maxRetries {
 				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
 			}
@@ -974,6 +1110,12 @@ func (h *Handler) connectStreamWithRetry(r *http.Request, jcBody map[string]inte
 		if err != nil {
 			lastErr = err
 			reqLog(r).Error("stream connect error", "attempt", attempt, "max", maxRetries, "error", err)
+			// Deterministic content rejections (thinking signature, image
+			// input) are handled by the caller's one-shot repair; identical
+			// retries can only fail the same way.
+			if isThinkingSignatureError(err.Error()) || isImageUnsupportedError(err.Error()) {
+				return nil, lastErr
+			}
 			if attempt < maxRetries {
 				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
 			}
@@ -1000,8 +1142,11 @@ func (h *Handler) connectStreamWithRetry(r *http.Request, jcBody map[string]inte
 			if isContextLimitError(dataContent) {
 				return nil, lastErr
 			}
-			// SENSITIVE_CONTENT errors are deterministic — retrying is pointless
-			if strings.Contains(dataContent, "SENSITIVE_CONTENT") {
+			// Deterministic errors — retrying identically is pointless:
+			// content_filter goes straight to the caller, thinking-signature
+			// and image-input rejections go to the one-shot repair path.
+			if strings.Contains(dataContent, "SENSITIVE_CONTENT") ||
+				isThinkingSignatureError(dataContent) || isImageUnsupportedError(dataContent) {
 				return nil, lastErr
 			}
 			if attempt < maxRetries {

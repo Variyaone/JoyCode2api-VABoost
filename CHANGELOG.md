@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-10-09
+
+### 上游容错（对齐 cc-switch 同类能力，单上游适配版）
+- Thinking 签名整流：上游因 thinking 签名不兼容/校验失败拒绝请求时，剥离历史 assistant 消息中的 thinking/redacted_thinking 块并对同一上游重试一次（非流式、流式、原生 Anthropic、Responses 四条路径全覆盖）；剥离前先让重试循环立即跳出，不再对确定性内容错误烧满 3 次原样重试。
+- 不支持图片降级：上游明确拒绝图片输入时，将所有 image 块（含 tool_result 内嵌）替换为 `[Unsupported Image]` 文本占位并重试一次，对话不中断。
+- 纯文本模型预判：新增已确认纯文本模型注册表（JoyAI-Code-1.5、GLM-5.3、GLM-5.2-jcloud、DeepSeek-V4-Pro、Doubao-Seed-2.0-pro，依据 2026-09-10 实测 vision=false），发送前预剥图片；视觉模型与未知模型不受影响，上游报错兜底仍保留。
+- Thinking Budget 错误保持透传不自动修复（维持既有设计哲学：静默改写调用方参数意图不可取）；thinking signature 剥离、图片降级均只处理请求内容，不动参数。
+- 块级重写基于原始 JSON，保留块的未知字段（citations、厂商扩展）逐字节原样保留；新增 12 组回归测试覆盖四条路径、正负分类器与字段保真。
+
 ## [Preview] - 2026-09-12
 
 - 消费视角首页：撤下未接入的会话/消息占位及重复连续天数，保留四项核心用量/费用指标；每日 Token、参考费用、请求次数趋势和明细表直接置于 Overview，补充模型 Token/费用排序。
