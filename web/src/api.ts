@@ -12,6 +12,7 @@ export interface Account {
   today_requests: number;
   total_tokens: number;
   today_tokens: number;
+  provider?: string; // "joycode" | "openclaw" | undefined (older backends / joycode default)
   credential_valid: number; // -1=unknown, 0=last check failed (not necessarily expired), 1=last check passed
   credential_checked_at?: string;
   credential_refreshed_at?: string;
@@ -255,6 +256,8 @@ export const api = {
   listAccounts: (signal?: AbortSignal) => request<{ accounts: Account[] }>('/api/accounts', { signal }).then(r => r.accounts),
   addAccount: (data: { user_id: string; pt_key: string; nickname?: string; is_default?: boolean; default_model?: string }) =>
     request<{ ok: boolean }>('/api/accounts', { method: 'POST', body: JSON.stringify(data) }),
+  addOpenClawAccount: (data: { user_id: string; nickname?: string; default_model?: string; is_default?: boolean }) =>
+    request<{ ok: boolean; user_id: string; nickname?: string }>('/api/accounts-openclaw', { method: 'POST', body: JSON.stringify(data) }),
   removeAccount: (userId: string) =>
     request<{ ok: boolean }>(`/api/accounts/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
   setDefault: (userId: string) =>

@@ -143,32 +143,33 @@ var serveCmd = &cobra.Command{
 				if timeout < 60 {
 					timeout = 60
 				}
+				build := func(account *store.Account, useShared bool) *joycode.Client {
+					var cl *joycode.Client
+					if account.Provider == "openclaw" {
+						cl = joycode.NewClient("", account.UserID)
+						cl.SetOpenClawContext()
+					} else {
+						cl = joycode.NewClient(account.PtKey, account.UserID)
+						if systemClient != nil && systemClient.PtKey != "" && systemClient.PtKey != "placeholder" && systemClient.UserID == account.UserID {
+							cl.SetAnthropicPtKey(systemClient.PtKey)
+						}
+					}
+					cl.SetTimeout(time.Duration(timeout) * time.Second)
+					if useShared {
+						cl.SetTransport(sharedTransport)
+					}
+					return cl
+				}
 				if apiKey != "" {
 					if account, _ := s.GetAccountByToken(apiKey); account != nil {
-						cl := joycode.NewClient(account.PtKey, account.UserID)
-						if systemClient != nil && systemClient.PtKey != "" && systemClient.PtKey != "placeholder" && systemClient.UserID == account.UserID {
-							cl.SetAnthropicPtKey(systemClient.PtKey)
-						}
-						cl.SetTimeout(time.Duration(timeout) * time.Second)
-						return cl
+						return build(account, false)
 					}
 					if account, _ := s.GetAccount(apiKey); account != nil {
-						cl := joycode.NewClient(account.PtKey, account.UserID)
-						if systemClient != nil && systemClient.PtKey != "" && systemClient.PtKey != "placeholder" && systemClient.UserID == account.UserID {
-							cl.SetAnthropicPtKey(systemClient.PtKey)
-						}
-						cl.SetTimeout(time.Duration(timeout) * time.Second)
-						return cl
+						return build(account, false)
 					}
 				}
 				if account, _ := s.GetDefaultAccount(); account != nil {
-					cl := joycode.NewClient(account.PtKey, account.UserID)
-					if systemClient != nil && systemClient.PtKey != "" && systemClient.PtKey != "placeholder" && systemClient.UserID == account.UserID {
-						cl.SetAnthropicPtKey(systemClient.PtKey)
-					}
-					cl.SetTimeout(time.Duration(timeout) * time.Second)
-					cl.SetTransport(sharedTransport)
-					return cl
+					return build(account, true)
 				}
 				return systemClient
 			}

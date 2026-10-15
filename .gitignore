@@ -76,3 +76,10 @@ data/*.db
 data/*.db-*
 deploy.ps1
 deploy.log
+
+# Local binaries/backups and session probe scripts
+JoyCode2Api.exe.bak-*
+JoyCode2Api.new.exe
+probe-*.js
+probe-*.go
+手动部署-openclaw.bat
