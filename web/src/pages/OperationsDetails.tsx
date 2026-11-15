@@ -10,6 +10,7 @@ import { useRefreshableResource } from '../hooks/useRefreshableResource';
 import AccountCredentialStatus, { credentialState } from '../components/AccountCredentialStatus';
 import CostOverview from '../components/CostOverview';
 import ModelBenchmarks from '../components/ModelBenchmarks';
+import UpstreamModels from '../components/UpstreamModels';
 import CandidateAudit from '../components/CandidateAudit';
 import ResourceStatus from '../components/ResourceStatus';
 import { CapabilityRecords, MoreStats, RecentRequests } from '../components/DashboardDetails';
@@ -33,6 +34,7 @@ export default function OperationsDetails({ costs, currency, onCurrencyChange, a
   const logs = useRefreshableResource(signal => api.getRecentLogs(50, signal), live);
   const benchmarks = useRefreshableResource(api.getModelBenchmarks, { enabled: active && panel === 'models', autoRefresh: false });
   const capabilities = useRefreshableResource(api.getModelCapabilities, { enabled: active && panel === 'models', autoRefresh: false });
+  const catalog = useRefreshableResource(api.getModelCatalog, { enabled: active && panel === 'models', autoRefresh: false });
 
   const currentResources = panel === 'live' ? [stats, accounts, logs, costs] : panel === 'costs' ? [costs] : [benchmarks, capabilities];
   const refreshing = health.refreshing || currentResources.some(r => r.refreshing || r.initialLoading);
@@ -96,6 +98,7 @@ export default function OperationsDetails({ costs, currency, onCurrencyChange, a
       { key: 'live', label: '运行概览', children: livePanel },
       { key: 'costs', label: '费用明细', children: <CostOverview resource={costs} currency={currency} onCurrencyChange={onCurrencyChange} /> },
       { key: 'models', label: '模型参考', children: <div className="jc-panel-stack">
+        <UpstreamModels resource={catalog} />
         <CandidateAudit />
         <ModelBenchmarks resource={benchmarks} />
         <ResourceStatus label="历史能力记录" resource={capabilities} snapshot />

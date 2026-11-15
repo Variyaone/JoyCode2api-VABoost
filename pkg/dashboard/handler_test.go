@@ -9,9 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	"testing"
+	"time"
 
+	"github.com/vibe-coding-labs/JoyCode2Api/pkg/joycode"
 	"github.com/vibe-coding-labs/JoyCode2Api/pkg/keepalive"
 	"github.com/vibe-coding-labs/JoyCode2Api/pkg/store"
 )
@@ -287,8 +288,8 @@ func TestHandleAddAndListAccounts(t *testing.T) {
 
 	// Add account
 	req := makeRequest(t, "POST", "/api/accounts", map[string]interface{}{
-		"user_id": "test-user",
-		"pt_key":  "test-pt",
+		"user_id":  "test-user",
+		"pt_key":   "test-pt",
 		"nickname": "TestNick",
 	})
 	w := httptest.NewRecorder()
@@ -428,6 +429,64 @@ func TestHandleModels(t *testing.T) {
 	first := models[0].(map[string]interface{})
 	if first["id"] == "" || first["name"] == "" {
 		t.Error("model should have id and name")
+	}
+}
+
+func TestHandleModelsUsesUpstreamCatalog(t *testing.T) {
+	joycode.InstallCatalog([]joycode.ModelInfo{
+		{Label: "JD-GLM-5.3", ModelID: "JD-GLM-5.3", ChatAPIModel: "GLM-5.3-jcloud"},
+		{Label: "GLM-5.3-jcloud", ModelID: "GLM-5.3-jcloud", ChatAPIModel: "GLM-5.3-jcloud"},
+	})
+	t.Cleanup(func() { joycode.InstallCatalog(nil) })
+
+	h, _ := setupTestHandler(t)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest("GET", "/api/models", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	m := decodeJSON(t, w)
+	if m["upstream_loaded"] != true {
+		t.Errorf("upstream_loaded = %v, want true", m["upstream_loaded"])
+	}
+	if m["upstream_at"] == "" {
+		t.Error("upstream_at should be set when a catalog is cached")
+	}
+
+	models, ok := m["models"].([]interface{})
+	if !ok {
+		t.Fatalf("models is not a list: %T", m["models"])
+	}
+	byID := map[string]map[string]interface{}{}
+	for _, raw := range models {
+		entry, ok := raw.(map[string]interface{})
+		if !ok {
+			t.Fatalf("model entry is not an object: %T", raw)
+		}
+		byID[entry["id"].(string)] = entry
+	}
+
+	// A model upstream publishes right now carries the id it accepts for it.
+	entry, ok := byID["JD-GLM-5.3"]
+	if !ok {
+		t.Fatal("JD-GLM-5.3 is missing from the model list")
+	}
+	if entry["chat_api_model"] != "GLM-5.3-jcloud" {
+		t.Errorf("chat_api_model = %v, want GLM-5.3-jcloud", entry["chat_api_model"])
+	}
+	if entry["source"] != "upstream" {
+		t.Errorf("source = %v, want upstream", entry["source"])
+	}
+
+	// Built-in models the upstream no longer publishes stay selectable.
+	if _, ok := byID["JoyAI-Code-1.5"]; !ok {
+		t.Error("built-in models should stay in the list")
 	}
 }
 

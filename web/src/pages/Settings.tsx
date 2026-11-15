@@ -9,6 +9,7 @@ import {
   SettingOutlined, CheckCircleOutlined, InfoCircleOutlined, LockOutlined,
 } from '@ant-design/icons';
 import { api, authApi, clearToken } from '../api';
+import { useModelOptions } from '../modelOptions';
 import type { Settings } from '../api';
 
 
@@ -115,6 +116,7 @@ const FIELD_GROUPS = [
 ];
 
 const SettingsPage: React.FC = () => {
+  const modelOptions = useModelOptions();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changePwLoading, setChangePwLoading] = useState(false);
@@ -228,7 +230,9 @@ const SettingsPage: React.FC = () => {
       case 'select':
         return (
           <Form.Item key={field.key} name={field.key} label={label}>
-            <Select placeholder={field.placeholder} options={field.options} allowClear disabled={field.readOnly} />
+            <Select placeholder={field.placeholder}
+              options={field.key === 'default_model' ? modelOptions : field.options}
+              allowClear disabled={field.readOnly} />
           </Form.Item>
         );
       case 'switch':

@@ -17,26 +17,14 @@ import {
 } from 'recharts';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, accountDisplayName } from '../api';
+import { useModelOptions } from '../modelOptions';
 import type { Account, AccountStats, ModelInfo, RequestLog } from '../api';
 import SvgClaudeCode from '../components/ClaudeCodeIcon';
 import SvgCodex from '../components/CodexIcon';
 import CommandTooltip from '../components/CommandTooltip';
 import { colors } from '../theme';
 
-const BUILTIN_MODELS = [
-  { label: 'JoyAI-Code-1.5（推荐）', value: 'JoyAI-Code-1.5' },
-  { label: 'Claude-Opus-5', value: 'Claude-Opus-5' },
-  { label: 'Claude-Opus-4.8', value: 'Claude-Opus-4.8' },
-  { label: 'GLM-5.3', value: 'GLM-5.3' },
-  { label: 'GLM-5.2-jcloud', value: 'GLM-5.2-jcloud' },
-  { label: 'Kimi-K3', value: 'Kimi-K3' },
-  { label: 'Kimi-K3-jcloud', value: 'Kimi-K3-jcloud' },
-  { label: 'DeepSeek-V4-Pro', value: 'DeepSeek-V4-Pro' },
-  { label: 'MiniMax-M3', value: 'MiniMax-M3' },
-  { label: 'GPT-6 Astra', value: 'GPT-6 Astra' },
-  { label: 'GPT-5.6 Sol', value: 'GPT-5.6 Sol' },
-  { label: 'Doubao-Seed-2.0-pro', value: 'Doubao-Seed-2.0-pro' },
-];
+
 
 const isClaudeModel = (model?: string) => Boolean(model && model.toLowerCase().startsWith('claude'));
 
@@ -141,6 +129,7 @@ const AccountDetail: React.FC = () => {
   const [account, setAccount] = useState<Account | null>(null);
   const [stats, setStats] = useState<AccountStats | null>(null);
   const [logs, setLogs] = useState<RequestLog[]>([]);
+  const modelOptions = useModelOptions();
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [modelLoading, setModelLoading] = useState(false);
@@ -225,10 +214,15 @@ const AccountDetail: React.FC = () => {
   if (!account) return <div style={{ textAlign: 'center', padding: 100 }}>账号不存在</div>;
 
   const allModelOptions = [
-    ...BUILTIN_MODELS,
+    ...modelOptions,
     ...models
-      .filter((m) => !BUILTIN_MODELS.some((b) => b.value === m.id))
-      .map((m) => ({ label: m.name || m.id, value: m.id })),
+      .filter((m) => !modelOptions.some((o) => o.value === m.id))
+      .map((m) => ({
+        label: m.chat_api_model && m.chat_api_model !== m.id
+          ? `${m.id} · 上游 id ${m.chat_api_model}`
+          : (m.name || m.id),
+        value: m.id,
+      })),
   ];
 
   const filteredLogs = logFilter === 'all'

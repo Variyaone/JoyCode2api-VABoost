@@ -33,22 +33,10 @@ import QRLoginModal from '../components/QRLoginModal';
 import AccountCredentialStatus from '../components/AccountCredentialStatus';
 import { useNavigate } from 'react-router-dom';
 import { api, accountDisplayName } from '../api';
+import { useModelOptions } from '../modelOptions';
 import type { Account } from '../api';
 
-const BUILTIN_MODELS = [
-  { label: 'JoyAI-Code-1.5（推荐）', value: 'JoyAI-Code-1.5' },
-  { label: 'Claude-Opus-5', value: 'Claude-Opus-5' },
-  { label: 'Claude-Opus-4.8', value: 'Claude-Opus-4.8' },
-  { label: 'GLM-5.3', value: 'GLM-5.3' },
-  { label: 'GLM-5.2-jcloud', value: 'GLM-5.2-jcloud' },
-  { label: 'Kimi-K3', value: 'Kimi-K3' },
-  { label: 'Kimi-K3-jcloud', value: 'Kimi-K3-jcloud' },
-  { label: 'DeepSeek-V4-Pro', value: 'DeepSeek-V4-Pro' },
-  { label: 'MiniMax-M3', value: 'MiniMax-M3' },
-  { label: 'GPT-6 Astra', value: 'GPT-6 Astra' },
-  { label: 'GPT-5.6 Sol', value: 'GPT-5.6 Sol' },
-  { label: 'Doubao-Seed-2.0-pro', value: 'Doubao-Seed-2.0-pro' },
-];
+
 
 const isClaudeModel = (model?: string) => Boolean(model && model.toLowerCase().startsWith('claude'));
 
@@ -143,6 +131,7 @@ const DragHandle: React.FC<{ id: string }> = ({ id }) => {
 
 const Accounts: React.FC = () => {
   const navigate = useNavigate();
+  const modelOptions = useModelOptions();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -738,7 +727,7 @@ const Accounts: React.FC = () => {
           >
             <Select
               placeholder="留空使用系统默认模型"
-              options={BUILTIN_MODELS}
+              options={modelOptions}
               allowClear
             />
           </Form.Item>
