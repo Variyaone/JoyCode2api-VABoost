@@ -1235,14 +1235,25 @@ func (h *Handler) listAccountModels(w http.ResponseWriter, r *http.Request, apiK
 	models, err := client.ListModels()
 	if err != nil {
 		slog.Error("list account models", "api_key", apiKey, "error", err)
-		// Fallback to hardcoded list
+		// Fallback to the dashboard's own model list.
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"models": modelInfos(h.modelList),
+			"models": h.dashboardModels(),
 		})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{"models": models})
+	entries := make([]ModelEntry, 0, len(models))
+	for _, m := range models {
+		label := strings.TrimSpace(m.Label)
+		id := strings.TrimSpace(m.ChatAPIModel)
+		if label == "" || id == "" {
+			continue
+		}
+		entries = append(entries, ModelEntry{
+			ID: label, Name: label, ChatAPIModel: id, Source: "upstream",
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"models": entries})
 }
 
 func (h *Handler) getAccountStats(w http.ResponseWriter, r *http.Request, apiKey string) {
@@ -1448,16 +1459,70 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"models": modelInfos(h.modelList),
+		"models":          h.dashboardModels(),
+		"upstream_at":     h.upstreamFetchedAt(),
+		"upstream_loaded": h.upstreamCatalogLoaded(),
 	})
 }
 
-func modelInfos(models []string) []map[string]string {
-	result := make([]map[string]string, len(models))
-	for i, m := range models {
-		result[i] = map[string]string{"id": m, "name": m}
+// ModelEntry is one model as the dashboard reports it. ID is the name a
+// client may send to the proxy; ChatAPIModel is the id the upstream accepts
+// for it. Source is "upstream" for a model the upstream publishes right now
+// and "builtin" for one that only survives in the built-in list.
+type ModelEntry struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	ChatAPIModel string `json:"chat_api_model,omitempty"`
+	Source       string `json:"source,omitempty"`
+}
+
+// dashboardModels returns what a client may ask for: every model the
+// upstream publishes right now, followed by the built-in models it no longer
+// publishes. The upstream list leads because it is the current truth; the
+// built-in tail keeps historical names selectable.
+func (h *Handler) dashboardModels() []ModelEntry {
+	entries := make([]ModelEntry, 0, len(h.modelList)+16)
+	seen := make(map[string]bool, len(h.modelList)+16)
+
+	for _, m := range joycode.CatalogEntries() {
+		label := strings.TrimSpace(m.Label)
+		id := strings.TrimSpace(m.ChatAPIModel)
+		if label == "" || id == "" || seen[label] {
+			continue
+		}
+		if joycode.IsCompletionOnlyModel(label) {
+			continue
+		}
+		seen[label] = true
+		entries = append(entries, ModelEntry{
+			ID: label, Name: label, ChatAPIModel: id, Source: "upstream",
+		})
 	}
-	return result
+
+	for _, m := range h.modelList {
+		if seen[m] {
+			continue
+		}
+		seen[m] = true
+		entries = append(entries, ModelEntry{ID: m, Name: m, Source: "builtin"})
+	}
+	return entries
+}
+
+// upstreamFetchedAt reports when the cached upstream catalog was built, or
+// an empty string when no catalog has been fetched yet.
+func (h *Handler) upstreamFetchedAt() string {
+	at, ok := joycode.CatalogFetchedAt()
+	if !ok {
+		return ""
+	}
+	return at.UTC().Format(time.RFC3339)
+}
+
+// upstreamCatalogLoaded reports whether the upstream catalog is cached.
+func (h *Handler) upstreamCatalogLoaded() bool {
+	_, ok := joycode.CatalogFetchedAt()
+	return ok
 }
 
 // --- Stats Handler ---

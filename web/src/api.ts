@@ -28,6 +28,18 @@ export function accountDisplayName(a: { nickname?: string; remark?: string; user
 export interface ModelInfo {
   id: string;
   name: string;
+  /** The id the upstream accepts for this model, when it differs from id. */
+  chat_api_model?: string;
+  /** "upstream" for a model the upstream publishes now, "builtin" for a built-in leftover. */
+  source?: string;
+}
+
+// The dashboard model list: what a client may send, plus whether the live
+// upstream catalog was available when it was built.
+export interface ModelCatalog {
+  models: ModelInfo[];
+  upstream_at: string;
+  upstream_loaded: boolean;
 }
 
 export interface Stats {
@@ -264,7 +276,8 @@ export const api = {
     request<{ ok: boolean }>(`/api/accounts/${encodeURIComponent(userId)}/default`, { method: 'PUT' }),
   validateAccount: (userId: string) =>
     request<{ valid: boolean }>(`/api/accounts/${encodeURIComponent(userId)}/validate`, { method: 'POST' }),
-  listModels: () => request<{ models: ModelInfo[] }>('/api/models').then(r => r.models),
+  getModelCatalog: () => request<ModelCatalog>('/api/models'),
+  listModels: () => request<ModelCatalog>('/api/models').then(r => r.models),
   listAccountModels: (userId: string) =>
     request<{ models: ModelInfo[] }>(`/api/accounts/${encodeURIComponent(userId)}/models`).then(r => r.models),
   getUsageActivity: (from: string, through: string, signal?: AbortSignal) =>

@@ -35,6 +35,8 @@ type Catalog struct {
 	upstream map[string]string
 	// labels maps chatApiModel -> display label.
 	labels map[string]string
+	// entries keeps the upstream model list as published, in upstream order.
+	entries []ModelInfo
 	// fetchedAt is when the catalog was built.
 	fetchedAt time.Time
 }
@@ -43,7 +45,7 @@ var (
 	catalogMu sync.RWMutex
 	catalog   *Catalog
 
-	catalogRefreshMu sync.Mutex
+	catalogRefreshMu  sync.Mutex
 	catalogRefreshing bool
 )
 
@@ -111,6 +113,30 @@ func CatalogNames() []string {
 	return names
 }
 
+// CatalogEntries returns the upstream model list as published: every model
+// with its display label and the id the upstream accepts for it, in upstream
+// order. It is empty until the catalog is first fetched.
+func CatalogEntries() []ModelInfo {
+	catalogMu.RLock()
+	defer catalogMu.RUnlock()
+	if catalog == nil {
+		return nil
+	}
+	out := make([]ModelInfo, len(catalog.entries))
+	copy(out, catalog.entries)
+	return out
+}
+
+// CatalogFetchedAt reports when the cached catalog was built.
+func CatalogFetchedAt() (time.Time, bool) {
+	catalogMu.RLock()
+	defer catalogMu.RUnlock()
+	if catalog == nil {
+		return time.Time{}, false
+	}
+	return catalog.fetchedAt, true
+}
+
 // InstallCatalog installs an upstream model list as the process-wide catalog.
 // An empty list clears the catalog. Callers that already hold a freshly
 // fetched model list use it to avoid a second upstream call.
@@ -124,6 +150,7 @@ func InstallCatalog(models []ModelInfo) {
 	next := &Catalog{
 		upstream:  make(map[string]string, len(models)*3),
 		labels:    make(map[string]string, len(models)),
+		entries:   make([]ModelInfo, 0, len(models)),
 		fetchedAt: time.Now(),
 	}
 	for _, m := range models {
@@ -139,6 +166,7 @@ func InstallCatalog(models []ModelInfo) {
 		if modelID := strings.TrimSpace(m.ModelID); modelID != "" {
 			next.upstream[modelID] = id
 		}
+		next.entries = append(next.entries, m)
 	}
 	catalogMu.Lock()
 	catalog = next
