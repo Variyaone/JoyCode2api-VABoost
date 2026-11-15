@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-11-15
+
+### 模型名解析：上游显示标签 → chat id（GLM 等 JD- 系列此前全部不可用）
+- 上游 `joycode_modelList` 里每个模型有两个字段：`label`（显示名）和 `chatApiModel`（真正可调用的 id）。`JD-` 开头的条目都是标签，上游只认 id —— 直接把标签发过去会拿到 6001「当前模型不可用或已下线」。JoyCode IDE 在本地做 label → id 映射后再发请求，代理此前是原样转发，因此 `JD-GLM-5.3`、`JD-GLM-5.2`、`JD-Kimi-K3` 等一票模型全部不可用。
+- 新增上游 modelList 缓存 `pkg/joycode/catalog.go`：建立 label/modelId → chatApiModel 映射，30 分钟 TTL，后台刷新；请求路径只读缓存，不等待上游调用。
+- 在 `prepareBody` / `prepareAnthropicBody`（发往上游前的唯一收口点）翻译 model，Anthropic / OpenAI / Responses 三条协议同时生效。
+- 修复默认模型静默复写：`resolveModel` 原本只认硬编码清单，上游刚发布的 id（例如 `GLM-5.3-jcloud`）会被悄悄换成账号默认模型，而响应回显的是请求名，客户端无法察觉自己跑的是另一个模型。现改为「静态清单 + 动态目录」双查。
+- 内置清单补上当前在线的 id（`GLM-5.3-jcloud`、`Kimi-K3.1`、`DeepSeek-V4.1-Flash`），作为上游 modelList 拉取失败时的兜底。
+- 实测：`JD-GLM-5.3`、`JD-GLM-5.2`、`JD-Kimi-K3`、`GLM-5.3-jcloud` 全部恢复正常，且 `GLM-5.3-jcloud` 不再被替换成 `GLM-5.3`。
+- README 补一条 FAQ：6001 的成因（标签 vs id）与处理方式。
+
 ## [Unreleased] - 2026-10-16
 
 ### 部署脚本升级（deploy-without-admin.bat）
