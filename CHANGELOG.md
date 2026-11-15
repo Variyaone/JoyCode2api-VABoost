@@ -13,6 +13,16 @@ All notable changes to this project will be documented in this file.
 - 实测：`JD-GLM-5.3`、`JD-GLM-5.2`、`JD-Kimi-K3`、`GLM-5.3-jcloud` 全部恢复正常，且 `GLM-5.3-jcloud` 不再被替换成 `GLM-5.3`。
 - README 补一条 FAQ：6001 的成因（标签 vs id）与处理方式。
 
+### 推理档位被拒时自动降档（GPT-6 Astra / GPT-6.1 Sol）
+- `thinking:disabled` 会翻译成 Responses API 的 `reasoning.effort="none"`，但 GPT-6 Astra 与 GPT-6.1 Sol 只接受 `low/medium/high/xhigh/max`，上游以 `Unsupported value: 'none' is not supported with the '...' model` 拒绝整次请求。
+- 代理不写死模型清单：上游的拒绝信息里就列出了该模型接受的档位，解析后取最低的一档重试一次。上游增减支持档位时无需改代码，也不会像写死的清单那样悄悄过期。
+- 只修复代理自己从 `thinking:disabled` 推导出的 `"none"`；调用方显式指定的其他 effort 被拒时按原样透传，不静默改写调用方参数。
+- Anthropic 与 OpenAI 两条协议、流式与非流式四条路径均已覆盖。
+
+### Dashboard 模型目录以上游在售列表为准
+- `/api/models` 改为返回上游当前发布的模型，每项带上可提交的 id（上游显示标签）、上游接受的 chat id 与来源标记；上游不再发布的内置模型作为尾部保留，历史名称仍可选。
+- 响应附带上游目录的抓取时间与是否已加载，便于判断目录是否新鲜。
+
 ## [Unreleased] - 2026-10-16
 
 ### 部署脚本升级（deploy-without-admin.bat）
