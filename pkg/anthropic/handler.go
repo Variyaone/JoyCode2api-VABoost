@@ -161,8 +161,6 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 				reqLog(r).Warn("upstream rejected thinking signature, retrying without thinking blocks (responses non-stream)", "error", truncate(errMsg, 300))
 			} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
 				reqLog(r).Warn("upstream rejected image input, retrying with placeholders (responses non-stream)", "error", truncate(errMsg, 300))
-			} else if effort, ok := unsupportedEffortFallback(errMsg, req); ok {
-				reqLog(r).Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts (responses non-stream)", "effort", effort, "error", truncate(errMsg, 300))
 			} else {
 				reqLog(r).Error("responses (non-stream) upstream error", "error", err)
 				msg := errMsg
@@ -187,8 +185,22 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 
 		result, err := readResponses(resp.Body, nil)
 		if err != nil {
-			writeAnthropicError(w, 500, err.Error())
-			return
+			// The upstream reports its rejection inside the SSE stream, not on
+			// the HTTP call, so the effort repair belongs here. It fires when
+			// the proxy-derived effort "none" is one the model does not accept.
+			if effort, ok := unsupportedEffortFallback(err.Error(), req); ok {
+				reqLog(r).Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts (responses non-stream)", "effort", effort, "error", truncate(err.Error(), 300))
+				resp.Body.Close()
+				resp, err = postResponses()
+				if err == nil {
+					defer resp.Body.Close()
+					result, err = readResponses(resp.Body, nil)
+				}
+			}
+			if err != nil {
+				writeAnthropicError(w, 500, err.Error())
+				return
+			}
 		}
 		content := []ContentBlock{}
 		if result.Text != "" {
@@ -739,9 +751,6 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 		} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
 			reqLog(r).Warn("upstream rejected image input, retrying with placeholders (responses stream)", "error", truncate(errMsg, 300))
 			repaired = true
-		} else if effort, ok := unsupportedEffortFallback(errMsg, req); ok {
-			reqLog(r).Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts (responses stream)", "effort", effort, "error", truncate(errMsg, 300))
-			repaired = true
 		}
 		if repaired {
 			jcBody := TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
@@ -767,7 +776,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 
 	currentBlockIndex := 0
 	textBlockStarted := false
-	result, readErr := readResponses(resp.Body, func(text string) {
+	emitText := func(text string) {
 		if !textBlockStarted {
 			textBlockStarted = true
 			FormatSSE(w, "content_block_start", sseContentBlockStart{
@@ -780,7 +789,24 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 			Delta: deltaText{Type: "text_delta", Text: text},
 		})
 		flusher.Flush()
-	})
+	}
+	result, readErr := readResponses(resp.Body, emitText)
+	if readErr != nil && !textBlockStarted {
+		// The upstream reports its rejection inside the SSE stream, not on the
+		// HTTP call. Retry the proxy-derived effort "none" with the lowest
+		// effort the model accepts; no content has reached the client yet.
+		if effort, ok := unsupportedEffortFallback(readErr.Error(), req); ok {
+			reqLog(r).Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts (responses stream)", "effort", effort, "error", truncate(readErr.Error(), 300))
+			resp.Body.Close()
+			jcBody := TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			jcBody["stream"] = true
+			resp, readErr = client.PostStream("/api/saas/openai/v1/responses", joycode.ChatToResponses(jcBody))
+			if readErr == nil {
+				defer resp.Body.Close()
+				result, readErr = readResponses(resp.Body, emitText)
+			}
+		}
+	}
 	if textBlockStarted {
 		FormatSSE(w, "content_block_stop", sseContentBlockStop{Type: "content_block_stop", Index: currentBlockIndex})
 		currentBlockIndex++
