@@ -116,3 +116,46 @@ func TestEffortResponsesPreservesRawMessageParts(t *testing.T) {
 		}
 	}
 }
+
+func TestUnsupportedEffortParsesUpstreamRejection(t *testing.T) {
+	// The exact upstream payload observed on 2026-11-15 for gpt-6-astra.
+	raw := `{"error":{"cause":"{\n  \"error\": {\n    \"message\": \"Unsupported value: 'none' is not supported with the 'gpt-6-astra-2026-09-03' model. Supported values are: 'low', 'medium', 'high', 'xhigh', and 'max'.\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"reasoning.effort\",\n    \"code\": \"unsupported_value\"\n  }\n}","code":400,"message":"模型服务调用失败","status":"FAILED_RESPONSE"}`
+	for _, tc := range []struct {
+		name       string
+		body       string
+		wantReject string
+		wantLowest string
+		wantOK     bool
+	}{
+		{"raw upstream json", raw, "none", "low", true},
+		{"plain message", "Unsupported value: 'none' is not supported with the 'gpt-6.1-sol-2026-09-29' model. Supported values are: 'low', 'medium', 'high', 'xhigh', and 'max'.", "none", "low", true},
+		{"other rejected value", "Unsupported value: 'ultra' is not supported with the 'gpt-6-astra' model. Supported values are: 'low', 'medium'.", "ultra", "low", true},
+		{"unrelated error", `{"error":{"message":"model overloaded"}}`, "", "", false},
+		{"no supported list", "Unsupported value: 'none' is not supported with the 'gpt-6-astra' model.", "", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rejected, lowest, ok := UnsupportedEffort(tc.body)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if rejected != tc.wantReject {
+				t.Fatalf("rejected = %q, want %q", rejected, tc.wantReject)
+			}
+			if lowest != tc.wantLowest {
+				t.Fatalf("lowest = %q, want %q", lowest, tc.wantLowest)
+			}
+		})
+	}
+}
+
+func TestThinkingDisabled(t *testing.T) {
+	if !ThinkingDisabled(map[string]interface{}{"type": "disabled"}) {
+		t.Fatal("disabled thinking not detected")
+	}
+	if ThinkingDisabled(map[string]interface{}{"type": "enabled"}) {
+		t.Fatal("enabled thinking reported as disabled")
+	}
+	if ThinkingDisabled(nil) {
+		t.Fatal("nil thinking reported as disabled")
+	}
+}

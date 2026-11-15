@@ -161,6 +161,8 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 				reqLog(r).Warn("upstream rejected thinking signature, retrying without thinking blocks (responses non-stream)", "error", truncate(errMsg, 300))
 			} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
 				reqLog(r).Warn("upstream rejected image input, retrying with placeholders (responses non-stream)", "error", truncate(errMsg, 300))
+			} else if effort, ok := unsupportedEffortFallback(errMsg, req); ok {
+				reqLog(r).Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts (responses non-stream)", "effort", effort, "error", truncate(errMsg, 300))
 			} else {
 				reqLog(r).Error("responses (non-stream) upstream error", "error", err)
 				msg := errMsg
@@ -736,6 +738,9 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 			repaired = true
 		} else if isImageUnsupportedError(errMsg) && replaceUnsupportedImages(req) > 0 {
 			reqLog(r).Warn("upstream rejected image input, retrying with placeholders (responses stream)", "error", truncate(errMsg, 300))
+			repaired = true
+		} else if effort, ok := unsupportedEffortFallback(errMsg, req); ok {
+			reqLog(r).Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts (responses stream)", "effort", effort, "error", truncate(errMsg, 300))
 			repaired = true
 		}
 		if repaired {

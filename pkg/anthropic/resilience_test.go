@@ -337,3 +337,41 @@ func TestStripThinkingBlocksPreservesOtherBlocks(t *testing.T) {
 		t.Fatalf("tool_use lost: %s", blocks[1])
 	}
 }
+
+func TestUnsupportedEffortFallbackRepairsOnlyTheProxyDerivedEffort(t *testing.T) {
+	astraErr := "upstream GPT response error: {\"error\":{\"message\":\"Unsupported value: 'none' is not supported with the 'gpt-6-astra-2026-09-03' model. Supported values are: 'low', 'medium', 'high', 'xhigh', and 'max'.\"}}"
+
+	t.Run("none is repaired to the lowest accepted effort", func(t *testing.T) {
+		req := &MessageRequest{Model: "GPT-6 Astra", Thinking: &ThinkingConfig{Type: "disabled"}}
+		effort, ok := unsupportedEffortFallback(astraErr, req)
+		if !ok {
+			t.Fatal("fallback not applied")
+		}
+		if effort != "low" {
+			t.Fatalf("effort = %q, want low", effort)
+		}
+		if req.OutputConfig == nil || req.OutputConfig.Effort != "low" {
+			t.Fatalf("request effort = %v, want low", req.OutputConfig)
+		}
+	})
+
+	t.Run("a caller's own rejected effort is left alone", func(t *testing.T) {
+		req := &MessageRequest{Model: "GPT-6 Astra", Thinking: &ThinkingConfig{Type: "enabled"}}
+		if _, ok := unsupportedEffortFallback("Unsupported value: 'ultra' is not supported with the 'gpt-6-astra' model. Supported values are: 'low'.", req); ok {
+			t.Fatal("repaired an effort the caller named")
+		}
+		if req.OutputConfig != nil {
+			t.Fatalf("request changed: %v", req.OutputConfig)
+		}
+	})
+
+	t.Run("unrelated errors do not touch the request", func(t *testing.T) {
+		req := &MessageRequest{Model: "GPT-6 Astra", Thinking: &ThinkingConfig{Type: "disabled"}}
+		if _, ok := unsupportedEffortFallback("model overloaded", req); ok {
+			t.Fatal("repaired on an unrelated error")
+		}
+		if req.OutputConfig != nil {
+			t.Fatalf("request changed: %v", req.OutputConfig)
+		}
+	})
+}

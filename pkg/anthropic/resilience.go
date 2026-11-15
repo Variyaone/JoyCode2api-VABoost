@@ -316,3 +316,25 @@ func marshalBlocks(blocks []json.RawMessage) json.RawMessage {
 	}
 	return out
 }
+
+// unsupportedEffortFallback reports whether the upstream rejected the
+// reasoning effort "none" — the value the proxy derives from thinking:disabled
+// — and pins the request to the lowest effort that model does accept.
+//
+// The effort the model accepts is read from the upstream's own rejection
+// message, so a model that gains or loses "none" needs no code change here.
+// 'none' is the one effort whose intent ("do not reason") a model may be
+// unable to express at all; the upstream names the remaining levels, and the
+// lowest of them is the closest fulfillment. Every other rejected effort is
+// the caller's own parameter and passes through untouched.
+func unsupportedEffortFallback(errMsg string, req *MessageRequest) (string, bool) {
+	rejected, lowest, ok := joycode.UnsupportedEffort(errMsg)
+	if !ok || rejected != "none" {
+		return "", false
+	}
+	if req.OutputConfig == nil {
+		req.OutputConfig = &OutputConfig{}
+	}
+	req.OutputConfig.Effort = lowest
+	return lowest, true
+}

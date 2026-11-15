@@ -73,7 +73,64 @@ func (s *Server) handleResponsesNonStream(w http.ResponseWriter, r *http.Request
 	// The upstream ignores stream:false and always returns SSE, so we always
 	// stream and aggregate the result into a single completion object.
 	body["stream"] = true
-	resp, err := client.PostStream("/api/saas/openai/v1/responses", body)
+
+	st := &ResponsesStreamState{Model: model, toolCalls: map[string]*responsesToolCall{}}
+	var text strings.Builder
+	read := func() error {
+		resp, err := client.PostStream("/api/saas/openai/v1/responses", body)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			for strings.HasPrefix(line, "data:") {
+				line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			}
+			if line == "" || !strings.HasPrefix(line, "{") {
+				continue
+			}
+			if isResponsesError(line) {
+				return errors.New(line)
+			}
+			for _, chunkJSON := range st.Feed(line) {
+				var chunk struct {
+					Choices []struct {
+						Delta struct {
+							Content   string `json:"content"`
+							ToolCalls []struct {
+								Function struct {
+									Name      string `json:"name"`
+									Arguments string `json:"arguments"`
+								} `json:"function"`
+							} `json:"tool_calls"`
+						} `json:"delta"`
+					} `json:"choices"`
+				}
+				if json.Unmarshal([]byte(chunkJSON), &chunk) == nil && len(chunk.Choices) > 0 {
+					if chunk.Choices[0].Delta.Content != "" {
+						text.WriteString(chunk.Choices[0].Delta.Content)
+					}
+				}
+			}
+		}
+		return scanner.Err()
+	}
+
+	err := read()
+	if err != nil {
+		// The upstream rejected the reasoning effort the proxy derived from
+		// thinking:disabled; retry once with the lowest effort the model
+		// accepts. Nothing has been written to the client yet.
+		if effort, ok := effortFallback(err.Error(), body); ok {
+			slog.Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts", "model", model, "effort", effort)
+			st = &ResponsesStreamState{Model: model, toolCalls: map[string]*responsesToolCall{}}
+			text.Reset()
+			err = read()
+		}
+	}
 	if err != nil {
 		slog.Error("responses non-stream upstream error", "model", model, "error", err)
 		msg := err.Error()
@@ -83,50 +140,6 @@ func (s *Server) handleResponsesNonStream(w http.ResponseWriter, r *http.Request
 			msg = "上游服务响应超时，请稍后重试。原始错误: " + msg
 		}
 		writeError(w, code, msg)
-		return
-	}
-	defer resp.Body.Close()
-
-	st := &ResponsesStreamState{Model: model, toolCalls: map[string]*responsesToolCall{}}
-	var text strings.Builder
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		for strings.HasPrefix(line, "data:") {
-			line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		}
-		if line == "" || !strings.HasPrefix(line, "{") {
-			continue
-		}
-		if isResponsesError(line) {
-			writeError(w, 500, line)
-			return
-		}
-		for _, chunkJSON := range st.Feed(line) {
-			var chunk struct {
-				Choices []struct {
-					Delta struct {
-						Content   string `json:"content"`
-						ToolCalls []struct {
-							Function struct {
-								Name      string `json:"name"`
-								Arguments string `json:"arguments"`
-							} `json:"function"`
-						} `json:"tool_calls"`
-					} `json:"delta"`
-				} `json:"choices"`
-			}
-			if json.Unmarshal([]byte(chunkJSON), &chunk) == nil && len(chunk.Choices) > 0 {
-				if chunk.Choices[0].Delta.Content != "" {
-					text.WriteString(chunk.Choices[0].Delta.Content)
-				}
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		slog.Error("responses non-stream read error", "model", model, "error", err)
-		writeError(w, 500, err.Error())
 		return
 	}
 	// Collect tool calls from the state
@@ -223,31 +236,66 @@ func (s *Server) handleResponsesStream(w http.ResponseWriter, r *http.Request, c
 	st := &ResponsesStreamState{Model: model, toolCalls: map[string]*responsesToolCall{}}
 	sawDone := false
 	sawError := false
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		// The upstream double-wraps SSE: "data: event: x" / "data: data: {...}".
-		for strings.HasPrefix(line, "data:") {
-			line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	for attempt := 0; ; attempt++ {
+		st = &ResponsesStreamState{Model: model, toolCalls: map[string]*responsesToolCall{}}
+		sawDone, sawError = false, false
+		wrote := false
+		retry := false
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			// The upstream double-wraps SSE: "data: event: x" / "data: data: {...}".
+			for strings.HasPrefix(line, "data:") {
+				line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			}
+			if line == "" || !strings.HasPrefix(line, "{") {
+				continue
+			}
+			if isResponsesError(line) {
+				// The upstream rejected the reasoning effort the proxy derived
+				// from thinking:disabled; retry once with the lowest effort the
+				// model accepts. Only while nothing has been streamed yet, so
+				// the client never sees a duplicated answer.
+				if attempt == 0 && !wrote {
+					if effort, ok := effortFallback(line, body); ok {
+						slog.Warn("upstream rejected reasoning effort, retrying with the lowest effort the model accepts", "model", model, "effort", effort)
+						retry = true
+						break
+					}
+				}
+				sawError = true
+				slog.Warn("responses stream upstream error", "model", model, "payload", common.Truncate(line, 300))
+				fmt.Fprintf(w, "data: %s\n\n", line)
+				flusher.Flush()
+				continue
+			}
+			for _, chunk := range st.Feed(line) {
+				fmt.Fprintf(w, "data: %s\n\n", chunk)
+				flusher.Flush()
+				wrote = true
+			}
 		}
-		if line == "" || !strings.HasPrefix(line, "{") {
-			continue
+		if err := scanner.Err(); err != nil {
+			slog.Error("responses stream read error", "model", model, "error", err)
 		}
-		if isResponsesError(line) {
-			sawError = true
-			slog.Warn("responses stream upstream error", "model", model, "payload", common.Truncate(line, 300))
-			fmt.Fprintf(w, "data: %s\n\n", line)
+		if !retry {
+			break
+		}
+		resp.Body.Close()
+		resp, err = client.PostStream("/api/saas/openai/v1/responses", body)
+		if err != nil {
+			slog.Error("responses stream upstream error", "model", model, "error", err)
+			msg := err.Error()
+			if isTimeoutError(msg) {
+				msg = "上游服务响应超时，请稍后重试。原始错误: " + msg
+			}
+			fmt.Fprintf(w, "data: {\"error\":{\"message\":\"%s\"}}\n\n", msg)
 			flusher.Flush()
-			continue
-		}
-		for _, chunk := range st.Feed(line) {
-			fmt.Fprintf(w, "data: %s\n\n", chunk)
+			fmt.Fprint(w, "data: [DONE]\n\n")
 			flusher.Flush()
+			return
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		slog.Error("responses stream read error", "model", model, "error", err)
 	}
 	if !sawError {
 		for _, chunk := range st.Finalize() {
@@ -282,6 +330,28 @@ func isResponsesError(line string) bool {
 		return true
 	}
 	return false
+}
+
+// effortFallback rewrites the Responses body's reasoning effort to the lowest
+// value the model accepts when the upstream rejected "none" — the value the
+// proxy derives from thinking:disabled. The accepted values come from the
+// upstream's own rejection message, so a model that gains or loses "none"
+// needs no change here. Every other rejected effort is the caller's own
+// parameter and passes through untouched.
+func effortFallback(errMsg string, body map[string]interface{}) (string, bool) {
+	rejected, lowest, ok := joycode.UnsupportedEffort(errMsg)
+	if !ok || rejected != "none" {
+		return "", false
+	}
+	reasoning, _ := body["reasoning"].(map[string]interface{})
+	if reasoning == nil {
+		return "", false
+	}
+	if effort, _ := reasoning["effort"].(string); effort != "none" {
+		return "", false
+	}
+	reasoning["effort"] = lowest
+	return lowest, true
 }
 
 func (s *Server) handleNonStreamChat(w http.ResponseWriter, r *http.Request, client *joycode.Client, jcBody map[string]interface{}, model string) {
