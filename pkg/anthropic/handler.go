@@ -238,7 +238,9 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 			}
 			// HTML shell page: the gateway rejected the request outright
 			// (typically oversized); identical retries only burn minutes.
-			if isHtmlShellError(lastErr.Error()) {
+			// Tools-over-cap (GLM "tools 数量超过上限 128") is deterministic
+			// too — the caller's repair loop drops tool schemas.
+			if isHtmlShellError(lastErr.Error()) || isToolsLimitError(lastErr.Error()) {
 				break
 			}
 			if isUpstreamPromptError(lastErr.Error()) {
@@ -301,6 +303,18 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, req *M
 			jcResp, lastErr = client.Post(chatEndpoint, jcBody)
 			if lastErr != nil {
 				writeAnthropicError(w, 500, lastErr.Error())
+				return
+			}
+		} else if isToolsLimitError(errMsg) && dropToolSchemas(req) {
+			// Upstream caps tool declarations (GLM: "tools 数量超过上限 128",
+			// invalid_request_error param=tools). The conversation is fine;
+			// only the schema count is over — degrade to a plain completion
+			// rather than failing the whole conversation.
+			reqLog(r).Warn("upstream rejected tool schema count over its cap, retrying without tool schemas (non-stream)", "error", truncate(errMsg, 300))
+			jcBody = TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
+			jcResp, lastErr = client.Post(chatEndpoint, jcBody)
+			if lastErr != nil {
+				writeAnthropicRequestError(w, "上游模型限制挂载的工具数量（tools 超过上限）。已尝试去掉工具 schema 重试仍失败，请减少挂载的工具/MCP 数量后重试。原始错误: "+truncate(lastErr.Error(), 300))
 				return
 			}
 		} else if isHtmlShellError(errMsg) && dropToolSchemas(req) {
@@ -488,6 +502,12 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *Mess
 			// failures; degrade to a plain completion rather than dying.
 			reqLog(r).Warn("upstream answered with HTML shell page, retrying without tool schemas (stream)", "error", truncate(errMsg, 300))
 			repaired = true
+		} else if isToolsLimitError(errMsg) && dropToolSchemas(req) {
+			// Upstream caps tool declarations (GLM: "tools 数量超过上限 128",
+			// invalid_request_error param=tools). Degrade to a plain completion
+			// rather than dying; identical retries can never succeed.
+			reqLog(r).Warn("upstream rejected tool schema count over its cap, retrying without tool schemas (stream)", "error", truncate(errMsg, 300))
+			repaired = true
 		}
 		if repaired {
 			jcBody = TranslateRequest(req, store.GetAccountDefaultModel(r), systemDefault)
@@ -512,6 +532,11 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *Mess
 		if isHtmlShellError(errMsg) {
 			reqLog(r).Error("upstream answered with HTML shell page (stream), request rejected by gateway", "error", truncate(errMsg, 300))
 			writeStreamError(w, flusher, "上游网关拒绝了过大的请求（收到 HTML 页面而非 JSON）。请压缩对话历史（/compact）或减少挂载的工具数量后重试。原始错误: "+truncate(errMsg, 300))
+			return
+		}
+		if isToolsLimitError(errMsg) {
+			reqLog(r).Error("upstream rejected tool schema count over its cap (stream)", "error", truncate(errMsg, 300))
+			writeStreamError(w, flusher, "上游模型限制挂载的工具数量（tools 超过上限）。请减少挂载的工具/MCP 数量后重试。原始错误: "+truncate(errMsg, 300))
 			return
 		}
 		if strings.Contains(errMsg, "content_filter") || strings.Contains(errMsg, "SENSITIVE_CONTENT") {
@@ -1302,9 +1327,12 @@ func (h *Handler) connectStreamWithRetry(r *http.Request, jcBody map[string]inte
 			// the caller's repair loop strips empty user messages.
 			// HTML shell page: the gateway rejected the request outright
 			// (typically oversized); identical retries only burn minutes.
+			// Tools-over-cap (GLM "tools 数量超过上限 128") is deterministic
+			// as well — the caller's repair loop drops tool schemas.
 			if strings.Contains(dataContent, "SENSITIVE_CONTENT") ||
 				isUpstreamPromptError(dataContent) ||
 				isHtmlShellError(dataContent) ||
+				isToolsLimitError(dataContent) ||
 				isThinkingSignatureError(dataContent) || isImageUnsupportedError(dataContent) {
 				return nil, lastErr
 			}

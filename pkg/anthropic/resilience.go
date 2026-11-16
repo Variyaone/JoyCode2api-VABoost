@@ -54,6 +54,20 @@ func isUpstreamPromptError(body string) bool {
 		strings.Contains(body, "未正常接收到prompt参数")
 }
 
+// isToolsLimitError reports whether the upstream rejected the request because
+// the number of tool declarations exceeds its cap — GLM-family gateways reply
+// "tools 数量超过上限 128" (invalid_request_error, param=tools). The request
+// itself is fine; only the tool schema count is over. Observed with Claude
+// Code sessions mounting 160+ tool schemas through the proxy (2026-11-15,
+// request_logs 147889-147980: 60 consecutive 500s, session dead in the water).
+// The one-shot repair drops tool schemas and retries, same as the HTML-shell
+// oversized-payload path.
+func isToolsLimitError(body string) bool {
+	return strings.Contains(body, "tools 数量超过上限") ||
+		(strings.Contains(strings.ToLower(body), `"param":"tools"`) &&
+			strings.Contains(strings.ToLower(body), "invalid_request_error"))
+}
+
 // isHtmlShellError reports whether the upstream answered with its default HTML
 // landing page instead of JSON. The JoyCode gateway (JD's jfe-lb layer) does
 // this when it rejects a request outright — observed with very large payloads

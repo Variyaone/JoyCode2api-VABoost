@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-11-16
+
+### tools 数量超过上游上限（GLM 128）自动降级重试
+- 2026-11-15 实锤事故：Claude Code 会话挂载 160+ 工具 schema，GLM-5.3 上游以 `tools 数量超过上限 128`（invalid_request_error, param=tools）拒收，代理原样重试只会同样失败，连续 60 次 500（request_logs 147889-147980），「英国区组织架构英文名核实」会话因此卡死。
+- 新增 `isToolsLimitError` 分类器（resilience.go）：命中中文原文或 `param:"tools"` + invalid_request_error 形态即判定。
+- 四条路径全接入（与 HTML shell 同构的一次性修复）：非流式/流式的 dropToolSchemas 降级重试（去掉工具 schema 保住对话，tool 调用降级一次）、流式错误直通文案、`connectStreamWithRetry` 确定性错误短路（不再空转重试）、非流式外层 retry 循环短路。
+- 回归测试 `tools_limit_regression_test.go`：用 147980 的原始报文做分类判定 + 修复路径验证。
+
 ## [Unreleased] - 2026-11-15
 
 ### 模型名解析：上游显示标签 → chat id（GLM 等 JD- 系列此前全部不可用）
